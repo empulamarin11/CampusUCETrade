@@ -1,0 +1,26 @@
+{
+  "name": "campusucetrade",
+  "version": "1.0.0",
+  "description": "Monorepo managed with Turborepo.\r Branches: DEV, QA, PROD (main).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "turbo run test",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down -v"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "turbo": "^2.7.2"
+  },
+  "private": true,
+  "packageManager": "pnpm@9.0.0"
+}
