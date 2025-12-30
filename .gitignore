@@ -28,3 +28,10 @@ __pycache__/
 *.pyc
 .venv/
 .turbo/
+
+
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+crash.log
+crash.*.log
