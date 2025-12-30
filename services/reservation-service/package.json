@@ -1,0 +1,12 @@
+{
+  "name": "@campus/reservation-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"reservation-service: dev placeholder\"",
+    "build": "echo \"reservation-service: build placeholder\"",
+    "lint": "echo \"reservation-service: lint placeholder\"",
+    "test": "echo \"reservation-service: test placeholder\"",
+    "format": "echo \"reservation-service: format placeholder\""
+  }
+}

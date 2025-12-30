@@ -1,0 +1,12 @@
+{
+  "name": "@campus/search-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"search-service: dev placeholder\"",
+    "build": "echo \"search-service: build placeholder\"",
+    "lint": "echo \"search-service: lint placeholder\"",
+    "test": "echo \"search-service: test placeholder\"",
+    "format": "echo \"search-service: format placeholder\""
+  }
+}

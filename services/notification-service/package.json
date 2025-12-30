@@ -1,0 +1,12 @@
+{
+  "name": "@campus/notification-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"notification-service: dev placeholder\"",
+    "build": "echo \"notification-service: build placeholder\"",
+    "lint": "echo \"notification-service: lint placeholder\"",
+    "test": "echo \"notification-service: test placeholder\"",
+    "format": "echo \"notification-service: format placeholder\""
+  }
+}
