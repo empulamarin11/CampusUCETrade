@@ -25,3 +25,11 @@ output "asg_name" {
 output "s3_media_bucket" {
   value = module.media_bucket.bucket_name
 }
+
+output "db_endpoint" {
+  value = module.database.db_endpoint
+}
+
+output "db_port" {
+  value = module.database.db_port
+}

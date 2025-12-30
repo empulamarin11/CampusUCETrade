@@ -47,3 +47,23 @@ variable "ssh_key_name" {
   type    = string
   default = null
 }
+
+variable "db_instance_class" {
+  type    = string
+  default = "db.t4g.micro"
+}
+
+variable "db_engine_version" {
+  type    = string
+  default = "16"
+}
+
+variable "db_name" {
+  type    = string
+  default = "campusuce"
+}
+
+variable "db_username" {
+  type    = string
+  default = "campusuce"
+}
