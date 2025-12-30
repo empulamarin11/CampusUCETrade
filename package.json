@@ -13,7 +13,9 @@
     "lint": "turbo run lint",
     "format": "turbo run format",
     "docker:up": "docker compose up -d --build",
-    "docker:down": "docker compose down -v"
+    "docker:down": "docker compose down -v",
+    "dev:core": "turbo run dev --parallel --filter=@campus/auth-service --filter=@campus/user-service --filter=@campus/item-service --filter=@campus/search-service --filter=@campus/reservation-service",
+    "dev:all": "turbo run dev --parallel"
   },
   "keywords": [],
   "author": "",
