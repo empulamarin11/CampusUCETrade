@@ -9,3 +9,11 @@ module "network" {
   az_count = var.az_count
   tags     = var.tags
 }
+
+module "alb" {
+  source            = "../../modules/alb_public"
+  name              = local.name
+  vpc_id            = module.network.vpc_id
+  public_subnet_ids = module.network.public_subnet_ids
+  tags              = var.tags
+}
