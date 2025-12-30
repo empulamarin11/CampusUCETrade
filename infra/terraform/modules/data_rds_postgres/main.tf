@@ -31,6 +31,9 @@ resource "aws_db_subnet_group" "this" {
 resource "random_password" "db" {
   length  = 20
   special = true
+
+  # RDS restriction: only printable ASCII except '/', '@', '"', and space
+  override_special = "!#$%&'()*+,-.:;<=>?[]^_{|}~"
 }
 
 resource "aws_db_instance" "this" {
