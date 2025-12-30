@@ -35,3 +35,9 @@ module "compute" {
 
   tags = var.tags
 }
+
+module "media_bucket" {
+  source      = "../../modules/s3_media_bucket"
+  name_prefix = "${local.name}-media"
+  tags        = var.tags
+}
