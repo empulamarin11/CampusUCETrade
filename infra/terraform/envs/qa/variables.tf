@@ -37,3 +37,13 @@ variable "az_count" {
   type    = number
   default = 2
 }
+
+variable "instance_type" {
+  type    = string
+  default = "t3.small"
+}
+
+variable "ssh_key_name" {
+  type    = string
+  default = null
+}
