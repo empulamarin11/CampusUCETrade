@@ -66,3 +66,8 @@ variable "db_username" {
   type    = string
   default = "campusuce"
 }
+
+variable "instance_profile_name" {
+  type    = string
+  default = "LabInstanceProfile"
+}

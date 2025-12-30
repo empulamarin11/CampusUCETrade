@@ -21,7 +21,7 @@ module "alb" {
 module "compute" {
   source = "../../modules/compute_asg_docker_hosts"
 
-  name = local.name
+  name   = local.name
   vpc_id = module.network.vpc_id
 
   # Low-cost: EC2 in public subnets (no NAT)
@@ -32,6 +32,8 @@ module "compute" {
 
   instance_type = var.instance_type
   ssh_key_name  = var.ssh_key_name
+
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -45,7 +47,7 @@ module "media_bucket" {
 module "database" {
   source = "../../modules/data_rds_postgres"
 
-  name = local.name
+  name   = local.name
   vpc_id = module.network.vpc_id
 
   private_subnet_ids = module.network.private_subnet_ids
@@ -56,8 +58,8 @@ module "database" {
   db_name     = var.db_name
   db_username = var.db_username
 
-  instance_class  = var.db_instance_class
-  engine_version  = var.db_engine_version
+  instance_class = var.db_instance_class
+  engine_version = var.db_engine_version
 
   tags = var.tags
 }

@@ -21,6 +21,18 @@ resource "aws_security_group" "ec2" {
     security_groups = [var.alb_sg_id]
   }
 
+    dynamic "ingress" {
+    for_each = var.internal_ports
+    content {
+      description = "Internal traffic within ASG (same SG)"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      self        = true
+    }
+    }
+
+
   egress {
     description = "All outbound"
     from_port   = 0
@@ -32,47 +44,19 @@ resource "aws_security_group" "ec2" {
   tags = merge(var.tags, { Name = "${var.name}-ec2-sg" })
 }
 
-# IAM role for EC2 (minimum: SSM access)
-resource "aws_iam_role" "ec2" {
-  name = "${var.name}-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect = "Allow",
-      Principal = { Service = "ec2.amazonaws.com" },
-      Action = "sts:AssumeRole"
-    }]
-  })
-
-  tags = var.tags
-}
-
-resource "aws_iam_role_policy_attachment" "ssm" {
-  role       = aws_iam_role.ec2.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "ec2" {
-  name = "${var.name}-ec2-profile"
-  role = aws_iam_role.ec2.name
-}
-
 locals {
-  user_data = <<-EOF
+  user_data = <<-EOT
     #!/bin/bash
     set -euxo pipefail
 
-    # Install Docker (Amazon Linux 2023)
     dnf -y update
     dnf -y install docker
     systemctl enable docker
     systemctl start docker
 
-    # Run a simple nginx container to satisfy ALB health checks on :80
     docker rm -f campusuce-nginx || true
     docker run -d --name campusuce-nginx -p 80:80 nginx:alpine
-  EOF
+  EOT
 }
 
 resource "aws_launch_template" "this" {
@@ -83,12 +67,11 @@ resource "aws_launch_template" "this" {
   key_name = var.ssh_key_name
 
   iam_instance_profile {
-    name = aws_iam_instance_profile.ec2.name
+    name = var.instance_profile_name
   }
 
   vpc_security_group_ids = [aws_security_group.ec2.id]
-
-  user_data = base64encode(local.user_data)
+  user_data              = base64encode(local.user_data)
 
   tag_specifications {
     resource_type = "instance"
@@ -121,7 +104,6 @@ resource "aws_autoscaling_group" "this" {
     version = "$Latest"
   }
 
-  # propagate tags to instances
   dynamic "tag" {
     for_each = merge(var.tags, { Name = "${var.name}-asg" })
     content {
