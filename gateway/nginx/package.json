@@ -1,0 +1,12 @@
+{
+  "name": "@campus/gateway",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"gateway: dev placeholder\"",
+    "build": "echo \"gateway: build placeholder\"",
+    "lint": "echo \"gateway: lint placeholder\"",
+    "test": "echo \"gateway: test placeholder\"",
+    "format": "echo \"gateway: format placeholder\""
+  }
+}
