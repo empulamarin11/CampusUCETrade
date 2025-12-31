@@ -9,69 +9,13 @@ services:
     depends_on:
       - auth-service
       - user-service
-      - item-service
-      - search-service
-      - reservation-service
-      - delivery-service
-      - chat-service
-      - notification-service
-      - reputation-service
-      - traceability-service
 
   auth-service:
-    image: nginx:alpine
+    build:
+      context: ./services/auth-service
     container_name: campus-auth-service
 
   user-service:
-    image: nginx:alpine
+    build:
+      context: ./services/user-service
     container_name: campus-user-service
-
-  item-service:
-    image: nginx:alpine
-    container_name: campus-item-service
-
-  search-service:
-    image: nginx:alpine
-    container_name: campus-search-service
-
-  reservation-service:
-    image: nginx:alpine
-    container_name: campus-reservation-service
-
-  delivery-service:
-    image: nginx:alpine
-    container_name: campus-delivery-service
-
-  chat-service:
-    image: nginx:alpine
-    container_name: campus-chat-service
-
-  notification-service:
-    image: nginx:alpine
-    container_name: campus-notification-service
-
-  reputation-service:
-    image: nginx:alpine
-    container_name: campus-reputation-service
-
-  traceability-service:
-    image: nginx:alpine
-    container_name: campus-traceability-service
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: campus-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: campus-grafana
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
