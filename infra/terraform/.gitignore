@@ -8,3 +8,7 @@ crash.*.log
 
 # TF vars (often contain secrets)
 **/*.tfvars
+
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
