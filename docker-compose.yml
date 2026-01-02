@@ -9,6 +9,8 @@ services:
     depends_on:
       - auth-service
       - user-service
+      - item-service
+      - search-service
 
   auth-service:
     build:
@@ -19,3 +21,21 @@ services:
     build:
       context: ./services/user-service
     container_name: campus-user-service
+
+  item-service:
+    build:
+      context: ./services/item-service
+    container_name: campus-item-service
+    environment:
+      - SERVICE_ROOT_PATH=/items
+    expose:
+      - "8000"
+
+  search-service:
+    build:
+      context: ./services/search-service
+    container_name: campus-search-service
+    environment:
+      - SERVICE_ROOT_PATH=/search
+    expose:
+      - "8000"
