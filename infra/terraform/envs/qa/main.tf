@@ -24,6 +24,9 @@ module "compute" {
   name   = local.name
   vpc_id = module.network.vpc_id
 
+  ssh_public_key_path = var.ssh_public_key_path
+
+
   # Low-cost: EC2 in public subnets (no NAT)
   subnet_ids = module.network.public_subnet_ids
 
@@ -32,6 +35,9 @@ module "compute" {
 
   instance_type = var.instance_type
   ssh_key_name  = var.ssh_key_name
+
+  ssh_ingress_cidrs = var.ssh_ingress_cidrs
+
 
   instance_profile_name = var.instance_profile_name
 

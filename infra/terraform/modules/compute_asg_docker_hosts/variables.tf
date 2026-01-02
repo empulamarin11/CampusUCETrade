@@ -59,3 +59,15 @@ variable "internal_ports" {
     3000   # grafana (optional)
   ]
 }
+
+variable "ssh_ingress_cidrs" {
+  description = "Temporary SSH access CIDRs (IPv4). Example: [\"1.2.3.4/32\"]."
+  type        = list(string)
+  default     = []
+}
+
+variable "ssh_public_key_path" {
+  type        = string
+  default     = ""
+  description = "Path to the SSH public key file (.pub). If empty, no key is created."
+}

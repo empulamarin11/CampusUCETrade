@@ -10,7 +10,7 @@ data "aws_ami" "al2023" {
 
 resource "aws_security_group" "ec2" {
   name        = "${var.name}-ec2-sg"
-  description = "EC2 docker hosts security group (only ALB inbound)"
+  description = "EC2 docker hosts security group (only ALB inbound + internal + optional SSH)"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -21,7 +21,7 @@ resource "aws_security_group" "ec2" {
     security_groups = [var.alb_sg_id]
   }
 
-    dynamic "ingress" {
+  dynamic "ingress" {
     for_each = var.internal_ports
     content {
       description = "Internal traffic within ASG (same SG)"
@@ -30,8 +30,19 @@ resource "aws_security_group" "ec2" {
       protocol    = "tcp"
       self        = true
     }
-    }
+  }
 
+  # TEMP SSH (debug only)
+  dynamic "ingress" {
+    for_each = var.ssh_ingress_cidrs
+    content {
+      description = "SSH from operator IP (temporary)"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+    }
+  }
 
   egress {
     description = "All outbound"
@@ -44,31 +55,16 @@ resource "aws_security_group" "ec2" {
   tags = merge(var.tags, { Name = "${var.name}-ec2-sg" })
 }
 
-locals {
-  user_data = <<-EOT
-    #!/bin/bash
-    set -euxo pipefail
-
-    dnf -y update
-    dnf -y install docker
-    systemctl enable docker
-    systemctl start docker
-
-    docker rm -f campusuce-nginx || true
-    docker run -d --name campusuce-nginx -p 80:80 nginx:alpine
-  EOT
-}
-
 resource "aws_launch_template" "this" {
   name_prefix   = "${var.name}-lt-"
   image_id      = data.aws_ami.al2023.id
   instance_type = var.instance_type
 
-  key_name = var.ssh_key_name
+  key_name = var.ssh_public_key_path != "" ? aws_key_pair.this.key_name : var.ssh_key_name
 
 
   vpc_security_group_ids = [aws_security_group.ec2.id]
-  user_data = base64encode(file("${path.module}/user_data.sh"))
+  user_data              = base64encode(file("${path.module}/user_data.sh"))
 
   tag_specifications {
     resource_type = "instance"
@@ -92,13 +88,15 @@ resource "aws_autoscaling_group" "this" {
   max_size         = var.max_size
 
   health_check_type         = "ELB"
-  health_check_grace_period = 120
+  health_check_grace_period = 180
 
   target_group_arns = [var.alb_target_group_arn]
 
   launch_template {
     id      = aws_launch_template.this.id
     version = "$Latest"
+
+  
   }
 
   dynamic "tag" {
@@ -109,4 +107,13 @@ resource "aws_autoscaling_group" "this" {
       propagate_at_launch = true
     }
   }
+
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50
+    }
+    triggers = ["launch_template"]
+  }
+  
 }

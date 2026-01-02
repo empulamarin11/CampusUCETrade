@@ -72,3 +72,16 @@ variable "instance_profile_name" {
   type    = string
   default = "LabInstanceProfile"
 }
+
+
+variable "ssh_ingress_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Temporary SSH access CIDRs (IPv4). Example: [\"1.2.3.4/32\"]."
+}
+
+variable "ssh_public_key_path" {
+  type        = string
+  default     = ""
+  description = "Local path to public SSH key (.pub)"
+}
