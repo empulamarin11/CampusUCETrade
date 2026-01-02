@@ -39,3 +39,21 @@ services:
       - SERVICE_ROOT_PATH=/search
     expose:
       - "8000"
+
+  reservation-service:
+    build:
+      context: ./services/reservation-service
+    container_name: campus-reservation-service
+    environment:
+      - SERVICE_ROOT_PATH=/reservations
+    expose:
+      - "8000"
+
+  delivery-service:
+    build:
+      context: ./services/delivery-service
+    container_name: campus-delivery-service
+    environment:
+      - SERVICE_ROOT_PATH=/delivery
+    expose:
+      - "8000"
