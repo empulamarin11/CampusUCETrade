@@ -1,105 +1,71 @@
-data "aws_ami" "al2023" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
-  }
-}
-
-resource "aws_security_group" "ec2" {
-  name        = "${var.name}-ec2-sg"
-  description = "EC2 docker hosts security group (only ALB inbound)"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "App traffic from ALB"
-    from_port       = var.target_port
-    to_port         = var.target_port
-    protocol        = "tcp"
-    security_groups = [var.alb_sg_id]
-  }
-
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, { Name = "${var.name}-ec2-sg" })
-}
-
 locals {
-  user_data = <<-EOF
-    #!/bin/bash
-    set -euxo pipefail
-
-    dnf -y update
-    dnf -y install docker
-    systemctl enable docker
-    systemctl start docker
-
-    docker rm -f campusuce-nginx || true
-    docker run -d --name campusuce-nginx -p 80:80 nginx:alpine
-  EOF
+  name = "${var.project}-${var.env}"
 }
 
-resource "aws_launch_template" "this" {
-  name_prefix   = "${var.name}-lt-"
-  image_id      = data.aws_ami.al2023.id
+module "network" {
+  source   = "../../modules/network_vpc"
+  name     = local.name
+  vpc_cidr = var.vpc_cidr
+  az_count = var.az_count
+  tags     = var.tags
+}
+
+module "alb" {
+  source            = "../../modules/alb_public"
+  name              = local.name
+  vpc_id            = module.network.vpc_id
+  public_subnet_ids = module.network.public_subnet_ids
+  tags              = var.tags
+}
+
+module "compute" {
+  source = "../../modules/compute_asg_docker_hosts"
+
+  name   = local.name
+  vpc_id = module.network.vpc_id
+
+  ssh_public_key_path = var.ssh_public_key_path
+
+
+  # Low-cost: EC2 in public subnets (no NAT)
+  subnet_ids = module.network.public_subnet_ids
+
+  alb_sg_id            = module.alb.alb_sg_id
+  alb_target_group_arn = module.alb.target_group_arn
+
   instance_type = var.instance_type
+  ssh_key_name  = var.ssh_key_name
 
-  key_name = var.ssh_key_name
+  ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
-  # Use existing instance profile from AWS Academy/Lab (no iam:CreateRole needed)
-  iam_instance_profile {
-    name = var.instance_profile_name
-  }
 
-  vpc_security_group_ids = [aws_security_group.ec2.id]
+  instance_profile_name = var.instance_profile_name
 
-  user_data = base64encode(local.user_data)
-
-  tag_specifications {
-    resource_type = "instance"
-    tags          = merge(var.tags, { Name = "${var.name}-ec2" })
-  }
-
-  tag_specifications {
-    resource_type = "volume"
-    tags          = merge(var.tags, { Name = "${var.name}-volume" })
-  }
-
-  tags = merge(var.tags, { Name = "${var.name}-lt" })
+  tags = var.tags
 }
 
-resource "aws_autoscaling_group" "this" {
-  name                = "${var.name}-asg"
-  vpc_zone_identifier = var.subnet_ids
+module "media_bucket" {
+  source      = "../../modules/s3_media_bucket"
+  name_prefix = "${local.name}-media"
+  tags        = var.tags
+}
 
-  min_size         = var.min_size
-  desired_capacity = var.desired_capacity
-  max_size         = var.max_size
+module "database" {
+  source = "../../modules/data_rds_postgres"
 
-  health_check_type         = "ELB"
-  health_check_grace_period = 120
+  name   = local.name
+  vpc_id = module.network.vpc_id
 
-  target_group_arns = [var.alb_target_group_arn]
+  private_subnet_ids = module.network.private_subnet_ids
 
-  launch_template {
-    id      = aws_launch_template.this.id
-    version = "$Latest"
-  }
+  # Allow DB access only from EC2 hosts (Docker)
+  allowed_sg_ids = [module.compute.ec2_sg_id]
 
-  dynamic "tag" {
-    for_each = merge(var.tags, { Name = "${var.name}-asg" })
-    content {
-      key                 = tag.key
-      value               = tag.value
-      propagate_at_launch = true
-    }
-  }
+  db_name     = var.db_name
+  db_username = var.db_username
+
+  instance_class = var.db_instance_class
+  engine_version = var.db_engine_version
+
+  tags = var.tags
 }

@@ -5,7 +5,7 @@ variable "project" {
 
 variable "env" {
   type    = string
-  default = "prod"
+  default = "qa"
 }
 
 variable "aws_region" {
@@ -23,13 +23,14 @@ variable "tags" {
   default = {
     Project   = "campusuce-trade"
     ManagedBy = "terraform"
-    Env       = "prod"
+    Env       = "qa"
   }
 }
 
+# Network
 variable "vpc_cidr" {
   type    = string
-  default = "10.30.0.0/16"
+  default = "10.20.0.0/16"
 }
 
 variable "az_count" {
@@ -70,4 +71,17 @@ variable "db_username" {
 variable "instance_profile_name" {
   type    = string
   default = "LabInstanceProfile"
+}
+
+
+variable "ssh_ingress_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Temporary SSH access CIDRs (IPv4). Example: [\"1.2.3.4/32\"]."
+}
+
+variable "ssh_public_key_path" {
+  type        = string
+  default     = ""
+  description = "Local path to public SSH key (.pub)"
 }
