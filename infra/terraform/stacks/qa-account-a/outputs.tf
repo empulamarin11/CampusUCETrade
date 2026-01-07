@@ -1,3 +1,11 @@
+output "alb_dns_name" {
+  value = module.alb.alb_dns_name
+}
+
+output "asg_name" {
+  value = module.compute.asg_name
+}
+
 output "vpc_id" {
   value = module.network.vpc_id
 }
@@ -14,14 +22,6 @@ output "azs" {
   value = module.network.azs
 }
 
-output "alb_dns_name" {
-  value = module.alb.alb_dns_name
-}
-
-output "asg_name" {
-  value = module.compute.asg_name
-}
-
 output "s3_media_bucket" {
   value = module.media_bucket.bucket_name
 }
@@ -32,4 +32,10 @@ output "db_endpoint" {
 
 output "db_port" {
   value = module.database.db_port
+}
+
+
+# ✅ NEW: Bastion
+output "bastion_eip" {
+  value = module.bastion.bastion_eip
 }

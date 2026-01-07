@@ -8,9 +8,17 @@ data "aws_ami" "al2023" {
   }
 }
 
+
+
+locals {
+  effective_ssh_key_name = var.ssh_key_name != null ? var.ssh_key_name : (
+    var.ssh_public_key_path != "" ? aws_key_pair.this[0].key_name : null
+  )
+}
+
 resource "aws_security_group" "ec2" {
   name        = "${var.name}-ec2-sg"
-  description = "EC2 docker hosts security group (only ALB inbound + internal + optional SSH)"
+  description = "EC2 docker hosts security group (ALB inbound + internal + SSH via bastion or CIDR)"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -32,7 +40,7 @@ resource "aws_security_group" "ec2" {
     }
   }
 
-  # TEMP SSH (debug only)
+  # SSH from operator IPs (optional)
   dynamic "ingress" {
     for_each = var.ssh_ingress_cidrs
     content {
@@ -41,6 +49,18 @@ resource "aws_security_group" "ec2" {
       to_port     = 22
       protocol    = "tcp"
       cidr_blocks = [ingress.value]
+    }
+  }
+
+  # SSH from Bastion SG (recommended)
+  dynamic "ingress" {
+    for_each = var.bastion_sg_id != "" ? [var.bastion_sg_id] : []
+    content {
+      description     = "SSH from bastion SG"
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      security_groups = [ingress.value]
     }
   }
 
@@ -60,8 +80,12 @@ resource "aws_launch_template" "this" {
   image_id      = data.aws_ami.al2023.id
   instance_type = var.instance_type
 
-  key_name = var.ssh_public_key_path != "" ? aws_key_pair.this.key_name : var.ssh_key_name
+  key_name = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.this) > 0 ? aws_key_pair.this[0].key_name : null)
 
+
+  iam_instance_profile {
+    name = var.instance_profile_name
+  }
 
   vpc_security_group_ids = [aws_security_group.ec2.id]
   user_data              = base64encode(file("${path.module}/user_data.sh"))
@@ -95,8 +119,6 @@ resource "aws_autoscaling_group" "this" {
   launch_template {
     id      = aws_launch_template.this.id
     version = "$Latest"
-
-  
   }
 
   dynamic "tag" {
@@ -107,7 +129,4 @@ resource "aws_autoscaling_group" "this" {
       propagate_at_launch = true
     }
   }
-
-  
-  
 }

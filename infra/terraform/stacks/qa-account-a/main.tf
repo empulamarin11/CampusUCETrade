@@ -18,14 +18,25 @@ module "alb" {
   tags              = var.tags
 }
 
+# ✅ NEW: Bastion (1 per account)
+module "bastion" {
+  source = "../../modules/bastion_host"
+
+  name             = local.name
+  vpc_id           = module.network.vpc_id
+  public_subnet_id = module.network.public_subnet_ids[0]
+
+  ssh_key_name      = var.ssh_key_name
+  ssh_ingress_cidrs = var.ssh_ingress_cidrs
+
+  tags = var.tags
+}
+
 module "compute" {
   source = "../../modules/compute_asg_docker_hosts"
 
   name   = local.name
   vpc_id = module.network.vpc_id
-
-  ssh_public_key_path = var.ssh_public_key_path
-
 
   # Low-cost: EC2 in public subnets (no NAT)
   subnet_ids = module.network.public_subnet_ids
@@ -34,14 +45,21 @@ module "compute" {
   alb_target_group_arn = module.alb.target_group_arn
 
   instance_type = var.instance_type
-  ssh_key_name  = var.ssh_key_name
 
+  # ✅ important:
+  # - if you created key pair via ssh_public_key_path, leave ssh_key_name = null
+  # - if you want to use an existing key pair name, set ssh_key_name in tfvars
+  ssh_key_name        = var.ssh_key_name
+  ssh_public_key_path = var.ssh_public_key_path
+
+  # optional debug from your IPs (can be empty when bastion is used)
   ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
+  # ✅ NEW: allow SSH from bastion SG to ASG instances
+  bastion_sg_id = module.bastion.bastion_sg_id
 
   instance_profile_name = var.instance_profile_name
-
-  tags = var.tags
+  tags                  = var.tags
 }
 
 module "media_bucket" {
