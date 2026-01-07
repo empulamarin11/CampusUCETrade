@@ -11,9 +11,12 @@ services:
       - user-service
       - item-service
       - search-service
+      - reservation-service
+      - delivery-service
       - notification-service
       - reputation-service
       - traceability-service
+      - chat-service
 
   auth-service:
     build:
@@ -85,5 +88,14 @@ services:
     container_name: campus-traceability-service
     environment:
       - SERVICE_ROOT_PATH=/traceability
+    expose:
+      - "8000"
+
+  chat-service:
+    build:
+      context: ./services/chat-service
+    container_name: campus-chat-service
+    environment:
+      - SERVICE_ROOT_PATH=/chat
     expose:
       - "8000"
