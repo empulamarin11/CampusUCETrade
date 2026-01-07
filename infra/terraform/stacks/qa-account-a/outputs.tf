@@ -39,3 +39,11 @@ output "db_port" {
 output "bastion_eip" {
   value = module.bastion.bastion_eip
 }
+
+output "api_gateway_eip" {
+  value = module.api_gateway.public_ip
+}
+
+output "api_gateway_instance_id" {
+  value = module.api_gateway.instance_id
+}
