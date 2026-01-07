@@ -12,6 +12,8 @@ services:
       - item-service
       - search-service
       - notification-service
+      - reputation-service
+      - traceability-service
 
   auth-service:
     build:
@@ -65,5 +67,23 @@ services:
     container_name: campus-notification-service
     environment:
       - SERVICE_ROOT_PATH=/notifications
+    expose:
+      - "8000"
+
+  reputation-service:
+    build:
+      context: ./services/reputation-service
+    container_name: campus-reputation-service
+    environment:
+      - SERVICE_ROOT_PATH=/reputation
+    expose:
+      - "8000"
+
+  traceability-service:
+    build:
+      context: ./services/traceability-service
+    container_name: campus-traceability-service
+    environment:
+      - SERVICE_ROOT_PATH=/traceability
     expose:
       - "8000"
