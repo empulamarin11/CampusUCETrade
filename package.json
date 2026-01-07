@@ -27,17 +27,9 @@
     "dev:chat": "turbo run dev --parallel --filter=@campus/chat-service",
     "dev:notification": "turbo run dev --parallel --filter=@campus/notification-service",
     "dev:reputation": "turbo run dev --parallel --filter=@campus/reputation-service",
-    "dev:traceability": "turbo run dev --parallel --filter=@campus/traceability-service",
+    "dev:traceability": "turbo run dev --parallel --filter=@campus/traceability-service"
 
-    "dev:identity": "turbo run dev --parallel --filter=./services/identity-access/**",
-    "dev:catalog": "turbo run dev --parallel --filter=./services/catalog/**",
-    "dev:exchange": "turbo run dev --parallel --filter=./services/exchange/**",
-    "dev:communication": "turbo run dev --parallel --filter=./services/communication/**",
-    "dev:integration": "turbo run dev --parallel --filter=./services/integration/**",
-    "dev:reputation-domain": "turbo run dev --parallel --filter=./services/reputation/**",
-    "dev:traceability-domain": "turbo run dev --parallel --filter=./services/traceability/**",
-
-    "dev:core-domains": "turbo run dev --parallel --filter=./services/identity-access/** --filter=./services/catalog/**"
+    
   },
   "keywords": [],
   "author": "",

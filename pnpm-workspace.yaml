@@ -1,6 +1,6 @@
 packages:
   - "apps/*"
-  - "services/**"
+  - "services/*"
   - "packages/*"
   - "gateway/*"
   - "observability/*"
