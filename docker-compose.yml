@@ -11,6 +11,7 @@ services:
       - user-service
       - item-service
       - search-service
+      - notification-service
 
   auth-service:
     build:
@@ -55,5 +56,14 @@ services:
     container_name: campus-delivery-service
     environment:
       - SERVICE_ROOT_PATH=/delivery
+    expose:
+      - "8000"
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: campus-notification-service
+    environment:
+      - SERVICE_ROOT_PATH=/notifications
     expose:
       - "8000"
