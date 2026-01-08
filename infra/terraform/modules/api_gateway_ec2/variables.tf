@@ -42,3 +42,9 @@ variable "instance_profile_name" {
   description = "IAM Instance Profile name for SSM access (e.g., LabInstanceProfile)."
   default     = null
 }
+
+variable "routes_rendered" {
+  type        = string
+  description = "Rendered nginx location blocks"
+  default     = ""
+}
