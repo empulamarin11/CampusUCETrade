@@ -2,19 +2,24 @@ variable "name" { type = string }
 variable "vpc_id" { type = string }
 variable "public_subnet_id" { type = string }
 
-variable "instance_type" {
-  type    = string
-  default = "t3.micro"
-}
-
 variable "ssh_key_name" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "ssh_ingress_cidrs" {
-  type        = list(string)
-  default     = []
-  description = "Operator public IPv4 CIDRs allowed to SSH into bastion."
+  type    = list(string)
+  default = []
+}
+
+variable "instance_profile_name" {
+  type    = string
+  default = null
+}
+
+variable "instance_type" {
+  type    = string
+  default = "t3.micro"
 }
 
 variable "tags" {

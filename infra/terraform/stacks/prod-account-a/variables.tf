@@ -90,3 +90,7 @@ variable "instance_profile_name" {
   type    = string
   default = "LabInstanceProfile"
 }
+
+variable "account" {
+  type = string
+}

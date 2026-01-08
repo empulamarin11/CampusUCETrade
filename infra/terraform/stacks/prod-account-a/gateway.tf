@@ -24,6 +24,9 @@ module "api_gateway" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
+  # ya no se usa en este modo
+  upstream_alb_dns = ""
+
   instance_profile_name = var.instance_profile_name
   instance_type         = "t3.micro"
 
@@ -36,5 +39,5 @@ module "api_gateway" {
 }
 
 output "api_gateway_eip" {
-  value = aws_eip.api_gw.public_ip
+  value = module.api_gateway.api_gw_eip
 }

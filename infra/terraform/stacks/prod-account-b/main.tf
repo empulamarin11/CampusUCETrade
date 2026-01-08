@@ -1,5 +1,5 @@
 locals {
-  name = "${var.project}-${var.env}-${var.account}"
+  name = "${var.project}-${var.env}-b"
 }
 
 module "network" {
@@ -20,8 +20,8 @@ module "bastion" {
   ssh_key_name      = var.ssh_key_name
   ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
-
-  tags = var.tags
+  instance_profile_name = var.instance_profile_name
+  tags                  = var.tags
 }
 
 module "media_bucket" {

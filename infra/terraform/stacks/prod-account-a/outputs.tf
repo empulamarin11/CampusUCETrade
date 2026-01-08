@@ -23,9 +23,9 @@ output "bastion_sg_id" {
 }
 
 # Hello World (API gateway EC2)
-output "api_gateway_eip" {
-  value = module.api_gateway.api_gw_eip
-}
+#output "api_gateway_eip" {
+# value = module.api_gateway.api_gw_eip
+#}
 
 output "api_gateway_instance_id" {
   value = module.api_gateway.api_gw_instance_id

@@ -1,10 +1,48 @@
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
+
   filter {
     name   = "name"
     values = ["al2023-ami-*-x86_64"]
   }
+}
+
+# Ensure AWS name constraints: max 32 chars, no trailing hyphen
+locals {
+  alb_name = replace(
+    substr(replace(var.name, "_", "-"), 0, 32),
+    "/-+$/",
+    ""
+  )
+
+  tg_name = replace(
+    substr(replace("${var.name}-tg", "_", "-"), 0, 32),
+    "/-+$/",
+    ""
+  )
+
+  user_data = <<-EOT
+#!/bin/bash
+set -euxo pipefail
+exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+dnf -y install nginx amazon-ssm-agent || true
+
+cat > /usr/share/nginx/html/index.html <<EOF
+<html>
+  <head><title>${var.service_name}</title></head>
+  <body>
+    <h1>Hello World</h1>
+    <p>Service: ${var.service_name}</p>
+    <p>Env: ${var.env}</p>
+  </body>
+</html>
+EOF
+
+systemctl enable --now amazon-ssm-agent || true
+systemctl enable --now nginx
+EOT
 }
 
 resource "aws_security_group" "alb" {
@@ -64,7 +102,7 @@ resource "aws_security_group" "ec2" {
 }
 
 resource "aws_lb" "this" {
-  name               = substr(replace(var.name, "_", "-"), 0, 32)
+  name               = local.alb_name
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = var.public_subnet_ids
@@ -72,7 +110,7 @@ resource "aws_lb" "this" {
 }
 
 resource "aws_lb_target_group" "this" {
-  name        = substr(replace("${var.name}-tg", "_", "-"), 0, 32)
+  name        = local.tg_name
   port        = 80
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -96,30 +134,6 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-locals {
-  user_data = base64encode(<<EOF
-    #!/bin/bash
-    set -euxo pipefail
-
-    dnf -y update
-    dnf -y install nginx
-
-    cat > /usr/share/nginx/html/index.html <<'HTML'
-    <html>
-    <head><title>${var.service_name}</title></head>
-    <body>
-        <h1>Hello World</h1>
-        <p>Service: ${var.service_name}</p>
-        <p>Env: ${var.env}</p>
-    </body>
-    </html>
-    HTML
-
-    systemctl enable --now nginx
-    EOF
-  )
-}
-
 resource "aws_launch_template" "this" {
   name_prefix   = "${var.name}-lt-"
   image_id      = data.aws_ami.al2023.id
@@ -129,8 +143,13 @@ resource "aws_launch_template" "this" {
     name = var.instance_profile_name
   }
 
-  vpc_security_group_ids = [aws_security_group.ec2.id]
-  user_data              = local.user_data
+  network_interfaces {
+    device_index                = 0
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.ec2.id]
+  }
+
+  user_data = base64encode(local.user_data)
 
   tag_specifications {
     resource_type = "instance"
