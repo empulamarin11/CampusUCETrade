@@ -1,0 +1,42 @@
+{
+  "name": "campusucetrade",
+  "version": "1.0.0",
+  "description": "Monorepo managed with Turborepo.\r Branches: DEV, QA, PROD (main).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "turbo run test",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down -v",
+
+    "dev:core": "turbo run dev --parallel --filter=@campus/auth-service --filter=@campus/user-service --filter=@campus/item-service --filter=@campus/search-service --filter=@campus/reservation-service",
+    "dev:all": "turbo run dev --parallel",
+
+    "dev:auth": "turbo run dev --parallel --filter=@campus/auth-service",
+    "dev:user": "turbo run dev --parallel --filter=@campus/user-service",
+    "dev:item": "turbo run dev --parallel --filter=@campus/item-service",
+    "dev:search": "turbo run dev --parallel --filter=@campus/search-service",
+    "dev:reservation": "turbo run dev --parallel --filter=@campus/reservation-service",
+    "dev:delivery": "turbo run dev --parallel --filter=@campus/delivery-service",
+    "dev:chat": "turbo run dev --parallel --filter=@campus/chat-service",
+    "dev:notification": "turbo run dev --parallel --filter=@campus/notification-service",
+    "dev:reputation": "turbo run dev --parallel --filter=@campus/reputation-service",
+    "dev:traceability": "turbo run dev --parallel --filter=@campus/traceability-service"
+
+    
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "turbo": "^2.7.2"
+  },
+  "private": true,
+  "packageManager": "pnpm@9.0.0"
+}

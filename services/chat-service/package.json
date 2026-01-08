@@ -1,0 +1,12 @@
+{
+  "name": "@campus/chat-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"chat-service: dev placeholder\"",
+    "build": "echo \"chat-service: build placeholder\"",
+    "lint": "echo \"chat-service: lint placeholder\"",
+    "test": "echo \"chat-service: test placeholder\"",
+    "format": "echo \"chat-service: format placeholder\""
+  }
+}
