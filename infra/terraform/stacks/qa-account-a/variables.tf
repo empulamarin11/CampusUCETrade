@@ -90,3 +90,17 @@ variable "instance_profile_name" {
   type    = string
   default = "LabInstanceProfile"
 }
+
+variable "svc_a_url" {
+  type        = map(string)
+  description = "QA-A service base URLs (http://EIP)"
+  default     = {}
+}
+
+variable "svc_b_url" {
+  type        = map(string)
+  description = "QA-B service base URLs (http://EIP)"
+  default     = {}
+}
+
+

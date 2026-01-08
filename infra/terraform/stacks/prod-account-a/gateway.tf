@@ -1,19 +1,36 @@
 locals {
   routes_rendered = join("\n", [
+    # ===== Services in prod-a (svc_a) =====
     "location = /auth { return 301 /auth/; }",
-    "location ^~ /auth/ { proxy_pass http://${module.svc_a["auth"].alb_dns_name}/; }",
+    format("location ^~ /auth/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", module.svc_a["auth"].alb_dns_name),
 
     "location = /user { return 301 /user/; }",
-    "location ^~ /user/ { proxy_pass http://${module.svc_a["user"].alb_dns_name}/; }",
+    format("location ^~ /user/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", module.svc_a["user"].alb_dns_name),
 
     "location = /item { return 301 /item/; }",
-    "location ^~ /item/ { proxy_pass http://${module.svc_a["item"].alb_dns_name}/; }",
+    format("location ^~ /item/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", module.svc_a["item"].alb_dns_name),
 
     "location = /search { return 301 /search/; }",
-    "location ^~ /search/ { proxy_pass http://${module.svc_a["search"].alb_dns_name}/; }",
+    format("location ^~ /search/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", module.svc_a["search"].alb_dns_name),
 
     "location = /chat { return 301 /chat/; }",
-    "location ^~ /chat/ { proxy_pass http://${module.svc_a["chat"].alb_dns_name}/; }",
+    format("location ^~ /chat/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", module.svc_a["chat"].alb_dns_name),
+
+    # ===== Services in prod-b (svc_b) via variable map =====
+    "location = /delivery { return 301 /delivery/; }",
+    format("location ^~ /delivery/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", var.svc_b_alb_dns["delivery"]),
+
+    "location = /notification { return 301 /notification/; }",
+    format("location ^~ /notification/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", var.svc_b_alb_dns["notification"]),
+
+    "location = /reputation { return 301 /reputation/; }",
+    format("location ^~ /reputation/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", var.svc_b_alb_dns["reputation"]),
+
+    "location = /reservation { return 301 /reservation/; }",
+    format("location ^~ /reservation/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", var.svc_b_alb_dns["reservation"]),
+
+    "location = /traceability { return 301 /traceability/; }",
+    format("location ^~ /traceability/ { set $upstream \"%s\"; proxy_pass http://$upstream/; }", var.svc_b_alb_dns["traceability"]),
   ])
 }
 
@@ -24,9 +41,7 @@ module "api_gateway" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
-  # ya no se usa en este modo
-  upstream_alb_dns = ""
-
+  upstream_alb_dns      = "localhost"
   instance_profile_name = var.instance_profile_name
   instance_type         = "t3.micro"
 
@@ -36,8 +51,4 @@ module "api_gateway" {
 
   routes_rendered = local.routes_rendered
   tags            = var.tags
-}
-
-output "api_gateway_eip" {
-  value = module.api_gateway.api_gw_eip
 }

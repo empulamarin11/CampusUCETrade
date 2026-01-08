@@ -8,5 +8,3 @@ output "bastion_sg_id" { value = module.bastion.bastion_sg_id }
 
 output "media_bucket_name" { value = module.media_bucket.bucket_name }
 
-output "api_gateway_eip" { value = module.api_gateway.api_gw_eip }
-output "api_gateway_instance_id" { value = module.api_gateway.api_gw_instance_id }

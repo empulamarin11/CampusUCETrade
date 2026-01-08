@@ -94,3 +94,8 @@ variable "instance_profile_name" {
 variable "account" {
   type = string
 }
+variable "svc_b_alb_dns" {
+  description = "ALB DNS names from prod-b services"
+  type        = map(string)
+}
+

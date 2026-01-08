@@ -33,25 +33,7 @@ module "bastion" {
   tags = var.tags
 }
 
-module "api_gateway" {
-  source = "../../modules/api_gateway_ec2"
 
-  name             = local.name
-  vpc_id           = module.network.vpc_id
-  public_subnet_id = module.network.public_subnet_ids[0]
-
-  # esto es CLAVE: proxy al ALB actual (por ahora)
-  upstream_alb_dns      = ""
-  instance_profile_name = var.instance_profile_name
-
-  # ssh
-  bastion_sg_id       = module.bastion.bastion_sg_id
-  ssh_ingress_cidrs   = var.ssh_ingress_cidrs
-  ssh_public_key_path = var.ssh_public_key_path
-
-  instance_type = "t3.micro"
-  tags          = var.tags
-}
 
 #module "compute" {
 # source = "../../modules/compute_asg_docker_hosts"

@@ -81,6 +81,9 @@ pid /run/nginx.pid;
 events { worker_connections 1024; }
 
 http {
+  resolver 169.254.169.253 valid=10s ipv6=off;
+  resolver_timeout 2s;
+
   include       /etc/nginx/mime.types;
   default_type  application/octet-stream;
   access_log  /var/log/nginx/access.log;
