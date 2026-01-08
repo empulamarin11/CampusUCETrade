@@ -37,3 +37,8 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+variable "instance_profile_name" {
+  type        = string
+  description = "IAM Instance Profile name for SSM access (e.g., LabInstanceProfile)."
+  default     = null
+}

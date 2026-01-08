@@ -73,45 +73,71 @@ locals {
     set -euxo pipefail
     exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
-    UPSTREAM="${var.upstream_alb_dns}"
-
     dnf -y update
-    dnf -y install docker
+    dnf -y install nginx
 
-    systemctl enable docker
-    systemctl start docker
+    cat > /etc/nginx/nginx.conf <<'CONF'
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log;
+    pid /run/nginx.pid;
 
-    mkdir -p /opt/api-gateway
+    events { worker_connections 1024; }
 
-    cat > /opt/api-gateway/nginx.conf <<'CONF'
-    events {}
     http {
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+      access_log  /var/log/nginx/access.log;
+      sendfile on;
+      keepalive_timeout 65;
+
       server {
         listen 80;
 
-        # Proxy a tu ALB actual (por ahora)
-        location / {
-          proxy_pass http://UPSTREAM_PLACEHOLDER;
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto $scheme;
+        location = / {
+          return 200 "API Gateway OK. Use: /auth /chat /item /search /user /reservation /delivery /notification /reputation /traceability\n";
         }
+
+        # Redirect /svc -> /svc/
+        location = /auth          { return 301 /auth/; }
+        location = /chat          { return 301 /chat/; }
+        location = /item          { return 301 /item/; }
+        location = /search        { return 301 /search/; }
+        location = /user          { return 301 /user/; }
+        location = /reservation   { return 301 /reservation/; }
+        location = /delivery      { return 301 /delivery/; }
+        location = /notification  { return 301 /notification/; }
+        location = /reputation    { return 301 /reputation/; }
+        location = /traceability  { return 301 /traceability/; }
+
+        # QA-A (5)
+        location ^~ /auth/   { proxy_pass http://100.52.17.14/; }
+        location ^~ /chat/   { proxy_pass http://52.5.68.88/; }
+        location ^~ /item/   { proxy_pass http://44.216.0.194/; }
+        location ^~ /search/ { proxy_pass http://3.222.181.74/; }
+        location ^~ /user/   { proxy_pass http://52.204.153.76/; }
+
+        # QA-B (5) (ruteo a IPs públicas de la otra cuenta)
+        location ^~ /reservation/  { proxy_pass http://100.51.111.147/; }
+        location ^~ /delivery/     { proxy_pass http://52.44.250.59/; }
+        location ^~ /notification/ { proxy_pass http://54.173.162.193/; }
+        location ^~ /reputation/   { proxy_pass http://52.207.137.220/; }
+        location ^~ /traceability/ { proxy_pass http://107.23.148.94/; }
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
       }
     }
     CONF
 
-    sed -i "s/UPSTREAM_PLACEHOLDER/$UPSTREAM/g" /opt/api-gateway/nginx.conf
-
-    docker rm -f api-gateway-nginx || true
-    docker run -d --name api-gateway-nginx \
-      -p 80:80 \
-      -v /opt/api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro \
-      nginx:alpine
-
-    docker ps
+    nginx -t
+    systemctl enable --now nginx
+    systemctl restart nginx
   EOT
 }
+
 
 resource "aws_instance" "api_gw" {
   ami                    = data.aws_ami.al2023.id
@@ -121,6 +147,8 @@ resource "aws_instance" "api_gw" {
   key_name               = aws_key_pair.api_gw.key_name
 
   user_data = local.user_data
+  # SSM access (requires AmazonSSMManagedInstanceCore on the role)
+  iam_instance_profile = var.instance_profile_name
 
   tags = merge(var.tags, { Name = "${var.name}-api-gateway" })
 }
