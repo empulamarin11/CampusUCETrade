@@ -1,4 +1,23 @@
 services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus-postgres
+    environment:
+      POSTGRES_DB: campusuce
+      POSTGRES_USER: campusuce
+      POSTGRES_PASSWORD: campusuce123
+    ports:
+      - "5432:5432"
+    volumes:
+      - campus_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: campus-redis
+    restart: unless-stopped
+    
   gateway:
     image: nginx:alpine
     container_name: campus-gateway
@@ -22,11 +41,23 @@ services:
     build:
       context: ./services/auth-service
     container_name: campus-auth-service
+    env_file:
+      - ./services/auth-service/.env.local
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    expose:
+      - "8000"
 
   user-service:
     build:
       context: ./services/user-service
     container_name: campus-user-service
+    env_file:
+      - ./services/user-service/.env.local
+    expose:
+      - "8000"
 
   item-service:
     build:
@@ -99,3 +130,6 @@ services:
       - SERVICE_ROOT_PATH=/chat
     expose:
       - "8000"
+
+volumes:
+  campus_pgdata:
