@@ -35,3 +35,12 @@ output "api_gateway_instance_id" {
 output "media_bucket_name" {
   value = module.media_bucket.bucket_name
 }
+output "db_endpoint" { value = module.database.db_endpoint }
+output "db_port"     { value = module.database.db_port }
+output "db_name"     { value = module.database.db_name }
+output "db_username" { value = module.database.db_username }
+
+output "db_password" {
+  value     = module.database.db_password
+  sensitive = true
+}

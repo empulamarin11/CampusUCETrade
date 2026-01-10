@@ -71,22 +71,23 @@ module "media_bucket" {
   tags        = var.tags
 }
 
-#module "database" {
-# source = "../../modules/data_rds_postgres"
+module "database" {
+  source = "../../modules/data_rds_postgres"
 
-#name   = local.name
-#vpc_id = module.network.vpc_id
+  name   = local.name
+  vpc_id = module.network.vpc_id
 
-#private_subnet_ids = module.network.private_subnet_ids
+  private_subnet_ids = module.network.private_subnet_ids
 
-# Allow DB access only from EC2 hosts (Docker)
-#allowed_sg_ids = [module.compute.ec2_sg_id]
+  # QA quick: allow from whole VPC
+  allowed_sg_ids      = []
+  allowed_cidr_blocks = [var.vpc_cidr]
 
-#db_name     = var.db_name
-#db_username = var.db_username
+  db_name     = var.db_name
+  db_username = var.db_username
 
-#instance_class = var.db_instance_class
-#engine_version = var.db_engine_version
+  instance_class = var.db_instance_class
+  engine_version = var.db_engine_version
 
-#tags = var.tags
-#}
+  tags = var.tags
+}

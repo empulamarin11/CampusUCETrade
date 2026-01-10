@@ -58,6 +58,8 @@ resource "aws_instance" "svc_hello" {
 
   ami           = data.aws_ami.al2023.id
   instance_type = var.instance_type
+  key_name = aws_key_pair.svc.key_name
+
 
   subnet_id = element(
     module.network.public_subnet_ids,
