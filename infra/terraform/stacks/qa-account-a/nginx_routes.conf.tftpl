@@ -1,0 +1,84 @@
+# -------------------------
+# Account A (QA-A)
+# -------------------------
+
+# AUTH
+location = /auth { return 301 /auth/; }
+location ^~ /auth/ {
+  rewrite ^/auth/?(.*)$ /$1 break;
+  proxy_pass ${svc_a_url["auth"]};
+}
+
+# USER (canonical)
+location = /user { return 301 /user/; }
+location ^~ /user/ {
+  rewrite ^/user/?(.*)$ /$1 break;
+  proxy_pass ${svc_a_url["user"]};
+}
+
+# USER Swagger/OpenAPI alias
+location = /users { return 301 /users/; }
+location ^~ /users/ {
+  rewrite ^/users/?(.*)$ /$1 break;
+  proxy_pass ${svc_a_url["user"]};
+}
+
+# ITEM
+location = /item { return 301 /item/; }
+location ^~ /item/ {
+  rewrite ^/item/?(.*)$ /$1 break;
+  proxy_pass ${svc_a_url["item"]};
+}
+
+# SEARCH
+location = /search { return 301 /search/; }
+location ^~ /search/ {
+  rewrite ^/search/?(.*)$ /$1 break;
+  proxy_pass ${svc_a_url["search"]};
+}
+
+# CHAT
+location = /chat { return 301 /chat/; }
+location ^~ /chat/ {
+  rewrite ^/chat/?(.*)$ /$1 break;
+  proxy_pass ${svc_a_url["chat"]};
+}
+
+# -------------------------
+# Account B (QA-B)
+# -------------------------
+
+# DELIVERY
+location = /delivery { return 301 /delivery/; }
+location ^~ /delivery/ {
+  rewrite ^/delivery/?(.*)$ /$1 break;
+  proxy_pass ${svc_b_url["delivery"]};
+}
+
+# NOTIFICATION
+location = /notification { return 301 /notification/; }
+location ^~ /notification/ {
+  rewrite ^/notification/?(.*)$ /$1 break;
+  proxy_pass ${svc_b_url["notification"]};
+}
+
+# REPUTATION
+location = /reputation { return 301 /reputation/; }
+location ^~ /reputation/ {
+  rewrite ^/reputation/?(.*)$ /$1 break;
+  proxy_pass ${svc_b_url["reputation"]};
+}
+
+# RESERVATION
+location = /reservation { return 301 /reservation/; }
+location ^~ /reservation/ {
+  rewrite ^/reservation/?(.*)$ /$1 break;
+  proxy_pass ${svc_b_url["reservation"]};
+}
+
+# TRACEABILITY
+location = /traceability { return 301 /traceability/; }
+location ^~ /traceability/ {
+  rewrite ^/traceability/?(.*)$ /$1 break;
+  proxy_pass ${svc_b_url["traceability"]};
+}

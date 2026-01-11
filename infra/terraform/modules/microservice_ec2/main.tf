@@ -8,18 +8,9 @@ data "aws_ami" "al2023" {
   }
 }
 
-resource "aws_key_pair" "api_gw" {
-  key_name   = "${var.name}-api-gw-key"
-  public_key = file(var.ssh_public_key_path)
-
-  tags = merge(var.tags, {
-    Name = "${var.name}-api-gw-key"
-  })
-}
-
-resource "aws_security_group" "api_gw" {
-  name        = "${var.name}-api-gw-sg"
-  description = "API Gateway SG (HTTP public, SSH only from Bastion + optional operator CIDR)"
+resource "aws_security_group" "this" {
+  name        = "${var.name}-sg"
+  description = "QA hello microservice SG (HTTP public, SSH from Bastion + optional operator)"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -57,43 +48,41 @@ resource "aws_security_group" "api_gw" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(var.tags, {
-    Name = "${var.name}-api-gw-sg"
-  })
+  tags = merge(var.tags, { Name = "${var.name}-sg" })
 }
 
-# Render user_data from a template file (keeps main.tf clean)
 locals {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
-    routes_rendered = var.routes_rendered
+    service = var.service
+    env     = var.env
   })
 }
 
-resource "aws_instance" "api_gw" {
+resource "aws_instance" "this" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
-  subnet_id              = var.public_subnet_id
-  vpc_security_group_ids = [aws_security_group.api_gw.id]
-  key_name               = aws_key_pair.api_gw.key_name
-
-  user_data = local.user_data
-
-  # IMPORTANT: If user_data changes, replace instance so cloud-init runs again
-  user_data_replace_on_change = true
+  subnet_id              = var.subnet_id
+  vpc_security_group_ids = [aws_security_group.this.id]
+  key_name               = var.key_name
 
   iam_instance_profile = var.instance_profile_name
 
+  user_data                  = local.user_data
+  user_data_replace_on_change = true
+
   tags = merge(var.tags, {
-    Name = "${var.name}-api-gateway"
+    Name    = var.name
+    Service = var.service
+    Type    = "qa-hello"
   })
 }
 
-resource "aws_eip" "api_gw" {
+resource "aws_eip" "this" {
   domain = "vpc"
-  tags   = merge(var.tags, { Name = "${var.name}-api-gw-eip" })
+  tags   = merge(var.tags, { Name = "${var.name}-eip" })
 }
 
-resource "aws_eip_association" "api_gw" {
-  allocation_id = aws_eip.api_gw.id
-  instance_id   = aws_instance.api_gw.id
+resource "aws_eip_association" "this" {
+  allocation_id = aws_eip.this.id
+  instance_id   = aws_instance.this.id
 }

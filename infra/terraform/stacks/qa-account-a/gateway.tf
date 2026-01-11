@@ -1,39 +1,14 @@
 ############################################
-# API Gateway (QA-A) routes
+# gateway.tf (QA Account A)
+# Path: infra/terraform/stacks/qa-account-a/gateway.tf
 ############################################
 
 locals {
-  routes_rendered = <<-ROUTES
-location = /auth { return 301 /auth/; }
-location ^~ /auth/ { proxy_pass ${var.svc_a_url["auth"]}/; }
-
-location = /user { return 301 /user/; }
-location ^~ /user/ { proxy_pass ${var.svc_a_url["user"]}/; }
-
-location = /item { return 301 /item/; }
-location ^~ /item/ { proxy_pass ${var.svc_a_url["item"]}/; }
-
-location = /search { return 301 /search/; }
-location ^~ /search/ { proxy_pass ${var.svc_a_url["search"]}/; }
-
-location = /chat { return 301 /chat/; }
-location ^~ /chat/ { proxy_pass ${var.svc_a_url["chat"]}/; }
-
-location = /delivery { return 301 /delivery/; }
-location ^~ /delivery/ { proxy_pass ${var.svc_b_url["delivery"]}/; }
-
-location = /notification { return 301 /notification/; }
-location ^~ /notification/ { proxy_pass ${var.svc_b_url["notification"]}/; }
-
-location = /reputation { return 301 /reputation/; }
-location ^~ /reputation/ { proxy_pass ${var.svc_b_url["reputation"]}/; }
-
-location = /reservation { return 301 /reservation/; }
-location ^~ /reservation/ { proxy_pass ${var.svc_b_url["reservation"]}/; }
-
-location = /traceability { return 301 /traceability/; }
-location ^~ /traceability/ { proxy_pass ${var.svc_b_url["traceability"]}/; }
-ROUTES
+  # Render routes from an external template
+  routes_rendered = templatefile("${path.module}/nginx_routes.conf.tftpl", {
+    svc_a_url = var.svc_a_url
+    svc_b_url = var.svc_b_url
+  })
 }
 
 module "api_gateway" {
@@ -43,7 +18,8 @@ module "api_gateway" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
-  upstream_alb_dns      = "localhost" # required by module, not used
+  upstream_alb_dns = "localhost" # legacy, not used
+
   instance_profile_name = var.instance_profile_name
   instance_type         = "t3.micro"
 
