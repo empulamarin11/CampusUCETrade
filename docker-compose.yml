@@ -65,8 +65,11 @@ services:
     container_name: campus-item-service
     environment:
       - SERVICE_ROOT_PATH=/items
-    expose:
-      - "8000"
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
 
   search-service:
     build:
@@ -74,8 +77,9 @@ services:
     container_name: campus-search-service
     environment:
       - SERVICE_ROOT_PATH=/search
-    expose:
-      - "8000"
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+    depends_on:
+      - postgres
 
   reservation-service:
     build:
@@ -83,8 +87,11 @@ services:
     container_name: campus-reservation-service
     environment:
       - SERVICE_ROOT_PATH=/reservations
-    expose:
-      - "8000"
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
 
   delivery-service:
     build:
@@ -92,6 +99,11 @@ services:
     container_name: campus-delivery-service
     environment:
       - SERVICE_ROOT_PATH=/delivery
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
 
@@ -101,6 +113,11 @@ services:
     container_name: campus-notification-service
     environment:
       - SERVICE_ROOT_PATH=/notifications
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
 
@@ -110,6 +127,11 @@ services:
     container_name: campus-reputation-service
     environment:
       - SERVICE_ROOT_PATH=/reputation
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
 
@@ -119,6 +141,9 @@ services:
     container_name: campus-traceability-service
     environment:
       - SERVICE_ROOT_PATH=/traceability
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
     expose:
       - "8000"
 
@@ -128,8 +153,15 @@ services:
     container_name: campus-chat-service
     environment:
       - SERVICE_ROOT_PATH=/chat
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      # Optional (only if you later add JWT validation in chat)
+      # - JWT_SECRET=dev_secret_change_me
+      # - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
+    restart: unless-stopped
 
 volumes:
   campus_pgdata:
