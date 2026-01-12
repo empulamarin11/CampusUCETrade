@@ -90,11 +90,13 @@ resource "aws_instance" "this" {
 }
 
 resource "aws_eip" "this" {
+  count  = var.use_eip ? 1 : 0
   domain = "vpc"
-  tags   = merge(var.tags, { Name = "${var.name}-eip" })
+  tags   = merge(var.tags, { Name = "-eip" })
 }
 
 resource "aws_eip_association" "this" {
-  allocation_id = aws_eip.this.id
+  count         = var.use_eip ? 1 : 0
+  allocation_id = aws_eip.this[0].id
   instance_id   = aws_instance.this.id
 }

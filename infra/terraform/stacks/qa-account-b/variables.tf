@@ -1,11 +1,3 @@
-variable "aws_profile" {
-  type = string
-}
-
-variable "aws_region" {
-  type = string
-}
-
 variable "project" {
   type    = string
   default = "campusuce-trade"
@@ -16,13 +8,29 @@ variable "env" {
   default = "qa"
 }
 
-variable "account" {
+variable "aws_region" {
   type    = string
-  default = "b"
+  default = "us-east-1"
 }
 
+variable "aws_profile" {
+  type    = string
+  default = "default"
+}
+
+variable "tags" {
+  type = map(string)
+  default = {
+    Project   = "campusuce-trade"
+    ManagedBy = "terraform"
+    Env       = "qa"
+  }
+}
+
+# Network
 variable "vpc_cidr" {
-  type = string
+  type    = string
+  default = "10.20.0.0/16"
 }
 
 variable "az_count" {
@@ -30,29 +38,91 @@ variable "az_count" {
   default = 2
 }
 
-variable "tags" {
-  type = map(string)
+# Compute
+variable "instance_type" {
+  type    = string
+  default = "t3.small"
 }
 
+# ✅ if empty/null, module may create key pair from ssh_public_key_path
 variable "ssh_key_name" {
   type    = string
   default = null
 }
 
-variable "ssh_ingress_cidrs" {
-  type    = list(string)
-  default = []
-}
-
+# ✅ local path to .pub (Windows path ok)
 variable "ssh_public_key_path" {
-  type = string
+  type        = string
+  default     = ""
+  description = "Local path to public SSH key (.pub). If empty, key pair resource is not created."
 }
 
-variable "instance_type" {
+# ✅ Bastion + optional direct SSH debug
+variable "ssh_ingress_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "Operator public IPv4 CIDRs allowed to SSH (used by bastion and optional direct EC2 SSH). Example: [\"1.2.3.4/32\"]."
+}
+
+# DB
+variable "db_instance_class" {
   type    = string
-  default = "t3.micro"
+  default = "db.t4g.micro"
 }
 
+variable "db_engine_version" {
+  type    = string
+  default = "16"
+}
+
+variable "db_name" {
+  type    = string
+  default = "campusuce"
+}
+
+variable "db_username" {
+  type    = string
+  default = "campusuce"
+}
+
+# IAM instance profile
 variable "instance_profile_name" {
-  type = string
+  type    = string
+  default = "LabInstanceProfile"
+}
+
+variable "svc_a_url" {
+  type        = map(string)
+  description = "QA-A service base URLs (http://EIP)"
+  default     = {}
+}
+
+variable "svc_b_url" {
+  type        = map(string)
+  description = "QA-B service base URLs (http://EIP)"
+  default     = {}
+}
+
+
+variable "ghcr_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "db_endpoint" { type = string }
+variable "db_port"     { type = number }
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "jwt_secret" {
+  type    = string
+  default = "dev_secret_change_me"
+}
+
+variable "jwt_algorithm" {
+  type    = string
+  default = "HS256"
 }

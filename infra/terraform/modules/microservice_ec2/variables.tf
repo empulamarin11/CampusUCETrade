@@ -100,3 +100,9 @@ variable "jwt_algorithm" {
   type    = string
   default = "HS256"
 }
+
+variable "use_eip" {
+  description = "Whether to allocate and associate an Elastic IP to the instance"
+  type        = bool
+  default     = true
+}

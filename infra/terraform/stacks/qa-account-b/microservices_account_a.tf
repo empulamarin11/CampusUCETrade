@@ -1,120 +1,51 @@
 locals {
-  # The other 5 "microservices" (simulated) for Account B
-  services_b = {
-    reservation  = {}
-    delivery     = {}
-    notification = {}
-    reputation   = {}
-    traceability = {}
-  }
+  services_b = toset(["reservation", "delivery", "notification", "reputation", "traceability"])
 }
 
-data "aws_ami" "al2023" {
-  most_recent = true
-  owners      = ["amazon"]
+module "svc_b" {
+  use_eip = false
 
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
-  }
-}
-
-resource "aws_security_group" "svc_hello" {
-  name        = "${local.name}-svc-hello-sg"
-  description = "QA hello microservices SG (HTTP public, SSH from Bastion only)"
-  vpc_id      = module.network.vpc_id
-
-  ingress {
-    description = "HTTP from internet"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description     = "SSH from Bastion only"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [module.bastion.bastion_sg_id]
-  }
-
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, { Name = "${local.name}-svc-hello-sg" })
-}
-
-resource "aws_instance" "svc_hello" {
+  source   = "../../modules/microservice_ec2"
   for_each = local.services_b
 
-  ami           = data.aws_ami.al2023.id
-  instance_type = var.instance_type
+  name    = "${local.name}-${each.key}"
+  service = each.key
+  env     = var.env
 
-  # Spread instances across public subnets
+  vpc_id = module.network.vpc_id
+
+  ghcr_owner    = "empulamarin11"
+  ghcr_username = "empulamarin11"
+  ghcr_token    = var.ghcr_token
+
+  # If these services use DB, keep them; if not, still safe to pass.
+  db_endpoint = var.db_endpoint
+  db_port     = var.db_port
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
+
+  jwt_secret    = var.jwt_secret
+  jwt_algorithm = var.jwt_algorithm
+
   subnet_id = element(
     module.network.public_subnet_ids,
-    index(sort(keys(local.services_b)), each.key) % length(module.network.public_subnet_ids)
+    index(sort(tolist(local.services_b)), each.key) % length(module.network.public_subnet_ids)
   )
 
-  vpc_security_group_ids = [aws_security_group.svc_hello.id]
+  instance_type          = var.instance_type
+  key_name               = aws_key_pair.svc.key_name
+  bastion_sg_id           = module.bastion.bastion_sg_id
+  ssh_ingress_cidrs       = var.ssh_ingress_cidrs
+  instance_profile_name   = var.instance_profile_name
 
-  # Optional (recommended): SSM access if the role has AmazonSSMManagedInstanceCore
-  iam_instance_profile = var.instance_profile_name
-
-  user_data = <<-EOT
-    #!/bin/bash
-    set -euxo pipefail
-    exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
-
-    dnf -y update
-    dnf -y install nginx
-
-    cat > /usr/share/nginx/html/index.html <<'HTML'
-    <html>
-      <head><title>${each.key}</title></head>
-      <body>
-        <h1>Hello World</h1>
-        <p>Service: ${each.key}</p>
-        <p>Env: ${var.env}</p>
-        <p>Account: ${var.account}</p>
-      </body>
-    </html>
-    HTML
-
-    systemctl enable --now nginx
-  EOT
-
-  tags = merge(var.tags, {
-    Name    = "${local.name}-${each.key}"
-    Service = each.key
-    Type    = "qa-hello"
-  })
-}
-
-resource "aws_eip" "svc_hello" {
-  for_each = local.services_b
-  domain   = "vpc"
-
-  tags = merge(var.tags, { Name = "${local.name}-${each.key}-eip" })
-}
-
-resource "aws_eip_association" "svc_hello" {
-  for_each      = local.services_b
-  allocation_id = aws_eip.svc_hello[each.key].id
-  instance_id   = aws_instance.svc_hello[each.key].id
+  tags = var.tags
 }
 
 output "svc_b_eip" {
-  value = { for k, e in aws_eip.svc_hello : k => e.public_ip }
+  value = { for k, m in module.svc_b : k => m.public_ip }
 }
 
 output "svc_b_url" {
-  value = { for k, e in aws_eip.svc_hello : k => "http://${e.public_ip}" }
+  value = { for k, m in module.svc_b : k => m.url }
 }
