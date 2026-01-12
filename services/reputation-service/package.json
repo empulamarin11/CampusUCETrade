@@ -1,0 +1,12 @@
+{
+  "name": "@campus/reputation-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"reputation-service: dev placeholder\"",
+    "build": "echo \"reputation-service: build placeholder\"",
+    "lint": "echo \"reputation-service: lint placeholder\"",
+    "test": "echo \"reputation-service: test placeholder\"",
+    "format": "echo \"reputation-service: format placeholder\""
+  }
+}

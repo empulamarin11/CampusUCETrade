@@ -1,0 +1,12 @@
+{
+  "name": "@campus/user-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"user-service: dev placeholder\"",
+    "build": "echo \"user-service: build placeholder\"",
+    "lint": "echo \"user-service: lint placeholder\"",
+    "test": "echo \"user-service: test placeholder\"",
+    "format": "echo \"user-service: format placeholder\""
+  }
+}

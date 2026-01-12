@@ -1,0 +1,12 @@
+{
+  "name": "@campus/traceability-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"traceability-service: dev placeholder\"",
+    "build": "echo \"traceability-service: build placeholder\"",
+    "lint": "echo \"traceability-service: lint placeholder\"",
+    "test": "echo \"traceability-service: test placeholder\"",
+    "format": "echo \"traceability-service: format placeholder\""
+  }
+}

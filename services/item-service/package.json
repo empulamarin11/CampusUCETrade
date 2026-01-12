@@ -1,0 +1,12 @@
+{
+  "name": "@campus/item-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"item-service: dev placeholder\"",
+    "build": "echo \"item-service: build placeholder\"",
+    "lint": "echo \"item-service: lint placeholder\"",
+    "test": "echo \"item-service: test placeholder\"",
+    "format": "echo \"item-service: format placeholder\""
+  }
+}

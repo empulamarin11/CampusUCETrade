@@ -1,0 +1,52 @@
+# Node
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.turbo/
+
+
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+crash.log
+crash.*.log
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+.terraform.lock.hcl
+
+# Overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

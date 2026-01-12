@@ -1,0 +1,12 @@
+{
+  "name": "@campus/auth-service",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo \"auth-service: dev placeholder\"",
+    "build": "echo \"auth-service: build placeholder\"",
+    "lint": "echo \"auth-service: lint placeholder\"",
+    "test": "echo \"auth-service: test placeholder\"",
+    "format": "echo \"auth-service: format placeholder\""
+  }
+}

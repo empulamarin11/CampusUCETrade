@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Logs to file + console
+exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+APP_DIR="/opt/campusucetrade"
+REPO_URL="${repo_url}"
+BRANCH="${repo_branch}"
+SERVICE_DIR="${service_dir}"
+SERVICE_ROOT_PATH="${service_root_path}"
+TARGET_PORT="${target_port}"
+
+echo "==> Update + install deps"
+dnf -y update
+dnf -y install docker git curl
+
+echo "==> Enable Docker"
+systemctl enable docker
+systemctl start docker
+
+mkdir -p "${APP_DIR}"
+cd "${APP_DIR}"
+
+if [ ! -d "${APP_DIR}/repo/.git" ]; then
+  rm -rf "${APP_DIR}/repo" || true
+  git clone --depth 1 --branch "${BRANCH}" "${REPO_URL}" repo
+else
+  cd "${APP_DIR}/repo"
+  git fetch origin "${BRANCH}"
+  git checkout "${BRANCH}"
+  git reset --hard "origin/${BRANCH}"
+fi
+
+cd "${APP_DIR}/repo/services/${SERVICE_DIR}"
+
+echo "==> Build Docker image"
+IMAGE_NAME="${SERVICE_DIR}:latest"
+docker build -t "${IMAGE_NAME}" .
+
+echo "==> Run container"
+docker rm -f "svc-${SERVICE_DIR}" || true
+
+# Expose service on the host TARGET_PORT (same as container 8000)
+docker run -d \
+  --restart=always \
+  --name "svc-${SERVICE_DIR}" \
+  -p "${TARGET_PORT}:8000" \
+  -e SERVICE_ROOT_PATH="${SERVICE_ROOT_PATH}" \
+  "${IMAGE_NAME}"
+
+echo "==> Local health check"
+curl -fsS "http://localhost:${TARGET_PORT}${health_check_path}" || true
+
+echo "==> Done"
+docker ps || true
