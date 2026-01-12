@@ -90,8 +90,13 @@ services:
       - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
       - JWT_SECRET=dev_secret_change_me
       - JWT_ALGORITHM=HS256
+      - RABBITMQ_URL=amqp://campus:campus123@rabbitmq:5672/%2F
+      - RABBITMQ_EXCHANGE=campus.events
     depends_on:
       - postgres
+      - rabbitmq
+    expose:
+      - "8000"
 
   delivery-service:
     build:
@@ -116,8 +121,13 @@ services:
       - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
       - JWT_SECRET=dev_secret_change_me
       - JWT_ALGORITHM=HS256
+      - RABBITMQ_URL=amqp://campus:campus123@rabbitmq:5672/%2F
+      - RABBITMQ_EXCHANGE=campus.events
+      - RABBITMQ_QUEUE=notification-service
+      - RABBITMQ_BINDINGS=reservation.*
     depends_on:
       - postgres
+      - rabbitmq
     expose:
       - "8000"
 
@@ -161,6 +171,17 @@ services:
       - postgres
     expose:
       - "8000"
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: campus-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: campus
+      RABBITMQ_DEFAULT_PASS: campus123
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Web UI
     restart: unless-stopped
 
 volumes:

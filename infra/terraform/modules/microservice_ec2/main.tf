@@ -53,8 +53,20 @@ resource "aws_security_group" "this" {
 
 locals {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
-    service = var.service
-    env     = var.env
+    service       = var.service
+    env           = var.env
+    ghcr_owner    = var.ghcr_owner
+    ghcr_username = var.ghcr_username
+    ghcr_token    = var.ghcr_token
+
+    db_endpoint = var.db_endpoint
+    db_port     = var.db_port
+    db_name     = var.db_name
+    db_username = var.db_username
+    db_password = var.db_password
+
+    jwt_secret    = var.jwt_secret
+    jwt_algorithm = var.jwt_algorithm
   })
 }
 

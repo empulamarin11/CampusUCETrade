@@ -3,46 +3,49 @@
 # -------------------------
 
 # AUTH
-location = /auth { return 301 /auth/; }
 location ^~ /auth/ {
-  rewrite ^/auth/?(.*)$ /$1 break;
+  proxy_set_header X-Forwarded-Prefix /auth;
   proxy_pass ${svc_a_url["auth"]};
 }
+location = /auth { return 301 /auth/; }
 
 # USER (canonical)
-location = /user { return 301 /user/; }
 location ^~ /user/ {
   rewrite ^/user/?(.*)$ /$1 break;
+  proxy_set_header X-Forwarded-Prefix /user;
   proxy_pass ${svc_a_url["user"]};
 }
+location = /user { return 301 /user/; }
 
-# USER Swagger/OpenAPI alias
-location = /users { return 301 /users/; }
 location ^~ /users/ {
   rewrite ^/users/?(.*)$ /$1 break;
+  proxy_set_header X-Forwarded-Prefix /users;
   proxy_pass ${svc_a_url["user"]};
 }
+location = /users { return 301 /users/; }
 
 # ITEM
-location = /item { return 301 /item/; }
 location ^~ /item/ {
   rewrite ^/item/?(.*)$ /$1 break;
+  proxy_set_header X-Forwarded-Prefix /item;
   proxy_pass ${svc_a_url["item"]};
 }
+location = /item { return 301 /item/; }
 
 # SEARCH
-location = /search { return 301 /search/; }
 location ^~ /search/ {
-  rewrite ^/search/?(.*)$ /$1 break;
+  proxy_set_header X-Forwarded-Prefix /search;
   proxy_pass ${svc_a_url["search"]};
 }
+location = /search { return 301 /search/; }
 
 # CHAT
-location = /chat { return 301 /chat/; }
 location ^~ /chat/ {
   rewrite ^/chat/?(.*)$ /$1 break;
+  proxy_set_header X-Forwarded-Prefix /chat;
   proxy_pass ${svc_a_url["chat"]};
 }
+location = /chat { return 301 /chat/; }
 
 # -------------------------
 # Account B (QA-B)

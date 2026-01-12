@@ -104,3 +104,25 @@ variable "svc_b_url" {
 }
 
 
+variable "ghcr_token" {
+  type      = string
+  sensitive = true
+}
+
+variable "db_endpoint" { type = string }
+variable "db_port"     { type = number }
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "jwt_secret" {
+  type    = string
+  default = "dev_secret_change_me"
+}
+
+variable "jwt_algorithm" {
+  type    = string
+  default = "HS256"
+}

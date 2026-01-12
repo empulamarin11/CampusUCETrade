@@ -11,7 +11,18 @@ module "svc_a" {
   env     = var.env
 
   vpc_id = module.network.vpc_id
+  ghcr_owner    = "empulamarin11"
+  ghcr_username = "empulamarin11"
+  ghcr_token    = var.ghcr_token
 
+  db_endpoint = var.db_endpoint
+  db_port     = var.db_port
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
+
+  jwt_secret    = var.jwt_secret
+  jwt_algorithm = var.jwt_algorithm
   subnet_id = element(
     module.network.public_subnet_ids,
     index(sort(tolist(local.services_a)), each.key) % length(module.network.public_subnet_ids)

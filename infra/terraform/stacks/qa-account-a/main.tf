@@ -26,7 +26,7 @@ module "bastion" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
-  ssh_key_name      = var.ssh_key_name
+  ssh_key_name = aws_key_pair.svc.key_name
   ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
 
