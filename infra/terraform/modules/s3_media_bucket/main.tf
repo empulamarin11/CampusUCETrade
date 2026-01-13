@@ -1,39 +1,36 @@
+
+# 1. Random suffix to ensure unique bucket name globally
 resource "random_id" "suffix" {
   byte_length = 4
 }
 
-locals {
-  bucket_name = "${var.name_prefix}-${random_id.suffix.hex}"
-}
-
+# 2. The Bucket itself
 resource "aws_s3_bucket" "this" {
-  bucket        = local.bucket_name
-  force_destroy = var.force_destroy
-  tags          = merge(var.tags, { Name = local.bucket_name })
+  bucket = "${var.name}-media-${random_id.suffix.hex}"
+  
+  # CRITICAL FOR DEV/ACADEMY:
+  # Allows Terraform to delete the bucket even if it contains files.
+  force_destroy = true 
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-media"
+  })
 }
 
+# 3. Enable Versioning (Optional, good for backup)
+resource "aws_s3_bucket_versioning" "this" {
+  bucket = aws_s3_bucket.this.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# 4. Security: Block Public Access (Make it private by default)
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket = aws_s3_bucket.this.id
 
   block_public_acls       = true
-  block_public_policy     = true
   ignore_public_acls      = true
+  block_public_policy     = true
   restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_ownership_controls" "this" {
-  bucket = aws_s3_bucket.this.id
-  rule {
-    object_ownership = "BucketOwnerPreferred"
-  }
 }

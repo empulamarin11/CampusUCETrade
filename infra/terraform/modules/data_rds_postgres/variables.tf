@@ -1,58 +1,52 @@
-variable "name" { type = string }
-variable "vpc_id" { type = string }
-variable "private_subnet_ids" { type = list(string) }
 
-variable "allowed_sg_ids" {
-  type    = list(string)
-  default = []
+variable "name" {
+  description = "Base name for resources"
+  type        = string
 }
 
-variable "allowed_cidr_blocks" {
-  type    = list(string)
-  default = []
+variable "vpc_id" {
+  description = "VPC ID where the RDS will be deployed"
+  type        = string
+}
+
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs for the DB Subnet Group"
+  type        = list(string)
 }
 
 variable "db_name" {
-  type    = string
-  default = "campusuce"
+  description = "Name of the database to create"
+  type        = string
+  default     = "campus_trade_db"
 }
 
 variable "db_username" {
-  type    = string
-  default = "campusuce"
+  description = "Master username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_password" {
+  description = "Master password (should be sensitive in real prod)"
+  type        = string
+  default     = "ChangeMe123!" # In real life, use AWS Secrets Manager
+  sensitive   = true
 }
 
 variable "instance_class" {
-  type    = string
-  default = "db.t4g.micro"
-}
-
-variable "allocated_storage" {
-  type    = number
-  default = 20
+  description = "RDS Instance Class"
+  type        = string
+  default     = "db.t3.micro" # Cheapest option for Academy
 }
 
 variable "engine_version" {
-  type    = string
-  default = "16"
-}
-
-variable "publicly_accessible" {
-  type    = bool
-  default = false
-}
-
-variable "skip_final_snapshot" {
-  type    = bool
-  default = true
-}
-
-variable "deletion_protection" {
-  type    = bool
-  default = false
+  description = "PostgreSQL Engine Version"
+  type        = string
+  default     = "16.3" # FIXED: Changed from 16.1 to 16.3 to avoid AWS errors
 }
 
 variable "tags" {
-  type    = map(string)
-  default = {}
+  description = "Tags to apply"
+  type        = map(string)
+  default     = {}
 }

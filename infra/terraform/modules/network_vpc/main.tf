@@ -1,81 +1,113 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
 
-locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
-}
-
-resource "aws_vpc" "this" {
+# ------------------------------------------------------------------------------
+# 1. VPC & INTERNET GATEWAY
+# ------------------------------------------------------------------------------
+resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
   enable_dns_hostnames = true
+  enable_dns_support   = true
 
   tags = merge(var.tags, {
     Name = "${var.name}-vpc"
   })
 }
 
-resource "aws_internet_gateway" "this" {
-  vpc_id = aws_vpc.this.id
-  tags   = merge(var.tags, { Name = "${var.name}-igw" })
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-igw"
+  })
 }
 
-# Public subnets (ALB + EC2)
+# ------------------------------------------------------------------------------
+# 2. PUBLIC SUBNETS
+# Accessible from the internet (Bastion, ALB)
+# ------------------------------------------------------------------------------
 resource "aws_subnet" "public" {
-  for_each = { for idx, az in local.azs : idx => az }
+  count             = length(var.public_subnets)
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.public_subnets[count.index]
+  availability_zone = var.azs[count.index]
 
-  vpc_id                  = aws_vpc.this.id
-  availability_zone       = each.value
-  cidr_block              = cidrsubnet(var.vpc_cidr, 8, each.key) # /24
   map_public_ip_on_launch = true
 
   tags = merge(var.tags, {
-    Name = "${var.name}-public-${each.value}"
-    Tier = "public"
+    Name = "${var.name}-public-${var.azs[count.index]}"
+    Tier = "Public"
   })
 }
 
-# Private subnets (data)
-resource "aws_subnet" "private" {
-  for_each = { for idx, az in local.azs : idx => az }
+# ------------------------------------------------------------------------------
+# 3. NAT GATEWAY (For Private Subnets to reach Internet)
+# We create 1 NAT Gateway to save costs (High Availability would require 1 per AZ)
+# ------------------------------------------------------------------------------
+resource "aws_eip" "nat" {
+  domain = "vpc"
+  tags   = merge(var.tags, { Name = "${var.name}-nat-eip" })
+}
 
-  vpc_id            = aws_vpc.this.id
-  availability_zone = each.value
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, each.key + 100) # /24
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public[0].id # Place NAT in the first public subnet
+
+  tags = merge(var.tags, { Name = "${var.name}-nat" })
+
+  depends_on = [aws_internet_gateway.igw]
+}
+
+# ------------------------------------------------------------------------------
+# 4. PRIVATE SUBNETS
+# Not directly accessible (App Nodes, DB)
+# ------------------------------------------------------------------------------
+resource "aws_subnet" "private" {
+  count             = length(var.private_subnets)
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.private_subnets[count.index]
+  availability_zone = var.azs[count.index]
 
   tags = merge(var.tags, {
-    Name = "${var.name}-private-${each.value}"
-    Tier = "private"
+    Name = "${var.name}-private-${var.azs[count.index]}"
+    Tier = "Private"
   })
 }
 
-# Public route table -> IGW
+# ------------------------------------------------------------------------------
+# 5. ROUTE TABLES
+# ------------------------------------------------------------------------------
+
+# Public Route Table: Traffic -> Internet Gateway
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.this.id
-  tags   = merge(var.tags, { Name = "${var.name}-rt-public" })
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = merge(var.tags, { Name = "${var.name}-public-rt" })
 }
 
-resource "aws_route" "public_default" {
-  route_table_id         = aws_route_table.public.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.this.id
-}
-
-resource "aws_route_table_association" "public_assoc" {
-  for_each       = aws_subnet.public
-  subnet_id      = each.value.id
+resource "aws_route_table_association" "public" {
+  count          = length(var.public_subnets)
+  subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-# Private route table (NO NAT for low-cost)
+# Private Route Table: Traffic -> NAT Gateway
 resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.this.id
-  tags   = merge(var.tags, { Name = "${var.name}-rt-private" })
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
+
+  tags = merge(var.tags, { Name = "${var.name}-private-rt" })
 }
 
-resource "aws_route_table_association" "private_assoc" {
-  for_each       = aws_subnet.private
-  subnet_id      = each.value.id
+resource "aws_route_table_association" "private" {
+  count          = length(var.private_subnets)
+  subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
