@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI
+
 from app.routers import router
 
 SERVICE_NAME = "search-service"
@@ -9,7 +10,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=f"CampusUCETrade - {SERVICE_NAME}",
-        version="0.1.0",
+        version="0.2.0",
         root_path=root_path,
         root_path_in_servers=True,
         docs_url="/docs",
@@ -17,7 +18,6 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(router)
-
     return app
 
 app = create_app()

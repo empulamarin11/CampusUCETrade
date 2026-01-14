@@ -1,68 +1,74 @@
-resource "aws_security_group" "db" {
-  name        = "${var.name}-db-sg"
-  description = "RDS PostgreSQL security group"
+
+# ------------------------------------------------------------------------------
+# 1. DB SUBNET GROUP
+# Tells RDS which subnets it can use (Must be Private Subnets)
+# ------------------------------------------------------------------------------
+resource "aws_db_subnet_group" "this" {
+  name       = "${var.name}-db-subnet-group"
+  subnet_ids = var.private_subnet_ids
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-db-subnet-group"
+  })
+}
+
+# ------------------------------------------------------------------------------
+# 2. SECURITY GROUP
+# Allows traffic to Port 5432 (Postgres) from within the VPC
+# ------------------------------------------------------------------------------
+resource "aws_security_group" "rds_sg" {
+  name        = "${var.name}-rds-sg"
+  description = "Allow PostgreSQL traffic from VPC"
   vpc_id      = var.vpc_id
 
+  # Inbound: Allow connection from any internal IP (App Nodes)
   ingress {
-    description     = "PostgreSQL from app/hosts"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = var.allowed_sg_ids
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"] # Assuming this is your VPC CIDR
+    description = "PostgreSQL access from VPC"
   }
 
   egress {
-    description = "All outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(var.tags, { Name = "${var.name}-db-sg" })
+  tags = var.tags
 }
 
-resource "aws_db_subnet_group" "this" {
-  name       = "${var.name}-db-subnets"
-  subnet_ids = var.private_subnet_ids
-  tags       = merge(var.tags, { Name = "${var.name}-db-subnets" })
-}
-
-resource "random_password" "db" {
-  length  = 20
-  special = true
-
-  # RDS restriction: only printable ASCII except '/', '@', '"', and space
-  override_special = "!#$%&'()*+,-.:;<=>?[]^_{|}~"
-}
-
+# ------------------------------------------------------------------------------
+# 3. RDS INSTANCE
+# ------------------------------------------------------------------------------
 resource "aws_db_instance" "this" {
   identifier = "${var.name}-postgres"
-
+  
+  # Engine
   engine         = "postgres"
   engine_version = var.engine_version
   instance_class = var.instance_class
 
-  allocated_storage = var.allocated_storage
-  storage_type      = "gp3"
+  # Storage
+  allocated_storage     = 20
+  max_allocated_storage = 50 # Autoscaling storage cap
+  storage_type          = "gp2"
 
+  # Credentials
   db_name  = var.db_name
   username = var.db_username
-  password = random_password.db.result
-  port     = 5432
+  password = var.db_password
 
-  vpc_security_group_ids = [aws_security_group.db.id]
+  # Networking
   db_subnet_group_name   = aws_db_subnet_group.this.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  publicly_accessible    = false # SECURITY: Never expose DB to internet
 
-  publicly_accessible     = var.publicly_accessible
-  multi_az                = false
-  backup_retention_period = 0
-
-  deletion_protection = var.deletion_protection
-  skip_final_snapshot = var.skip_final_snapshot
-
-  performance_insights_enabled = false
-  monitoring_interval          = 0
-
-  tags = merge(var.tags, { Name = "${var.name}-postgres" })
+  # Maintenance & Backups (Optimized for Academy/Dev)
+  skip_final_snapshot = true  # CRITICAL for Academy (avoids destroy errors)
+  deletion_protection = false 
+  
+  tags = var.tags
 }
