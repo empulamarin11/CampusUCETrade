@@ -169,7 +169,7 @@ module "database" {
 # ==============================================================================
 
 resource "aws_lb" "main" {
-  # 🛑 STOP: Only create ALB in PROD to save $$ in Academy
+  # STOP: Only create ALB in PROD to save $$ in Academy
   count = var.env == "prod" ? 1 : 0
 
   name               = "${local.name}-alb"
@@ -214,3 +214,4 @@ resource "aws_lb_target_group" "tg_core" {
 # IF path == /api/auth/* THEN forward to tg_core
 
 # ... (Repetir para Business y Ops)
+
