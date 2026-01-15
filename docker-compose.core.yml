@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus-postgres
+    environment:
+      POSTGRES_DB: campusuce
+      POSTGRES_USER: campusuce
+      POSTGRES_PASSWORD: campusuce123
+    ports:
+      - "5432:5432"
+    volumes:
+      - campus_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: campus-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./services/user-service
+    container_name: campus-user-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+    depends_on:
+      - postgres
+    ports:
+      - "8002:8000"
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: campus-auth-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8001:8000"
+
+volumes:
+  campus_pgdata:

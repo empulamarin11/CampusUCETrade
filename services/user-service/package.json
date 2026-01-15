@@ -1,27 +1,12 @@
 {
-  "name": "user-service",
-  "version": "1.0.0",
-  "description": "Manages detailed user profiles, preferences, and account metadata.",
-  "main": "index.js",
+  "name": "@campus/user-service",
+  "private": true,
+  "version": "0.0.0",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "helmet": "^8.1.0"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.0.8",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
+    "dev": "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000",
+    "build": "echo \"user-service: build\"",
+    "lint": "python -m ruff check .",
+    "test": "python -m pytest -q",
+    "format": "echo \"user-service: format\""
   }
 }
