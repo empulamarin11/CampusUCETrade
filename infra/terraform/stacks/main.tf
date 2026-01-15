@@ -1,27 +1,25 @@
 locals {
-  # Standard naming convention: project-environment (e.g., campus-trade-qa)
+  # Standard naming convention: project-environment (e.g., campusuce-trade-qa)
   name = "${var.project}-${var.env}"
+
+  is_qa   = var.env == "qa"
+  is_prod = var.env == "prod"
+  has_alb = var.env != "dev" # we enable ALB for QA + PROD
 }
 
 # ==============================================================================
 # 1. NETWORK & SECURITY LAYER
 # ==============================================================================
 
-# Network VPC Module
 module "network" {
   source = "../modules/network_vpc"
 
   name     = local.name
   vpc_cidr = var.vpc_cidr
 
-  # REMOVED: az_count = var.az_count
-  # The module now uses a default list of AZs defined in its variables.tf
-
   tags = var.tags
 }
 
-# Bastion Host for SSH Access (Jumpbox)
-# Security Rule: Only accessible via specific IPs (ssh_ingress_cidrs)
 module "bastion" {
   source = "../modules/bastion_host"
 
@@ -29,7 +27,6 @@ module "bastion" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
-  # Key Pair management
   ssh_key_name = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
   ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
@@ -37,127 +34,279 @@ module "bastion" {
 }
 
 # ==============================================================================
-# 2. COMPUTE LAYER (Environment Specific Strategy)
+# 2. LOAD BALANCING (ALB) - We use ALB as "API Gateway"
 # ==============================================================================
+# NOTE: This is enabled for QA and PROD (has_alb == true).
+# The ALB module creates:
+# - Public ALB
+# - ALB Security Group (open 80)
+# - Default Target Group + Listener
 
-# ------------------------------------------------------------------------------
-# SCENARIO A: QA / DEV Environment
-# Strategy: Cost Optimization (All-in-One)
-# Description: Runs all microservices in a single large instance to save costs.
-# ------------------------------------------------------------------------------
-module "compute_qa_all_in_one" {
-  source = "../modules/compute"
+module "alb" {
+  source = "../modules/alb_public"
+  count  = local.has_alb ? 1 : 0
 
-  # CONDITION: Only create if environment is NOT prod
-  count = var.env != "prod" ? 1 : 0
+  name              = local.name
+  vpc_id            = module.network.vpc_id
+  public_subnet_ids = module.network.public_subnet_ids
 
-  name          = "${local.name}-node-all"
-  environment   = var.env
-  role_name     = "all-in-one"
-  instance_type = "t3.large" # Larger instance for density packing
+  listener_port     = 80
+  target_port       = 80
+  health_check_path = "/health"
 
-  vpc_id             = module.network.vpc_id
-  private_subnet_ids = module.network.private_subnet_ids
-  
-  # Security: Allow SSH only from Bastion Host
-  # NOTE: Ensure your bastion module outputs 'security_group_id'
-  bastion_sg_id      = module.bastion.security_group_id 
-  
   tags = var.tags
 }
 
-# ------------------------------------------------------------------------------
-# SCENARIO B: PROD Environment
-# Strategy: Distributed High Availability (3 Functional Groups)
-# Description: Isolates failure domains by splitting services into groups.
-# ------------------------------------------------------------------------------
+# ==============================================================================
+# 3. COMPUTE LAYER
+# QA strategy: 4 hosts for microservices + 1 host for middleware (Rabbit/MQTT/Kafka/Redis)
+# PROD strategy: 3 functional groups (core/business/ops) + realtime + middleware (can be tuned later)
+# ==============================================================================
 
-# Group 1: Core Services (Auth, User, Chat)
+# --------------------------------------------
+# QA: Microservices Hosts (4)
+# --------------------------------------------
+
+module "compute_qa_core" {
+  source = "../modules/compute"
+  count  = local.is_qa ? 1 : 0
+
+  name          = "${local.name}-core"
+  environment   = var.env
+  role_name     = "qa-core"
+  instance_type = "t3.small"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+module "compute_qa_business" {
+  source = "../modules/compute"
+  count  = local.is_qa ? 1 : 0
+
+  name          = "${local.name}-business"
+  environment   = var.env
+  role_name     = "qa-business"
+  instance_type = "t3.small"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+module "compute_qa_ops" {
+  source = "../modules/compute"
+  count  = local.is_qa ? 1 : 0
+
+  name          = "${local.name}-ops"
+  environment   = var.env
+  role_name     = "qa-ops"
+  instance_type = "t3.small"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+module "compute_qa_realtime" {
+  source = "../modules/compute"
+  count  = local.is_qa ? 1 : 0
+
+  name          = "${local.name}-realtime"
+  environment   = var.env
+  role_name     = "qa-realtime"
+  instance_type = "t3.small"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+# --------------------------------------------
+# QA: Middleware Host (RabbitMQ + MQTT + Kafka + Redis)
+# --------------------------------------------
+module "compute_qa_middleware" {
+  source = "../modules/compute"
+  count  = local.is_qa ? 1 : 0
+
+  name          = "${local.name}-middleware"
+  environment   = var.env
+  role_name     = "qa-middleware"
+  instance_type = "t3.medium"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+# --------------------------------------------
+# PROD: Functional Groups (base)
+# --------------------------------------------
+
 module "compute_prod_core" {
   source = "../modules/compute"
-  
-  # CONDITION: Only create if environment IS prod
-  count = var.env == "prod" ? 1 : 0
+  count  = local.is_prod ? 1 : 0
 
-  name          = "${local.name}-group-core"
+  name          = "${local.name}-core"
   environment   = var.env
-  role_name     = "core-svcs"
+  role_name     = "prod-core"
   instance_type = "t3.medium"
-  
+
   vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
-  bastion_sg_id      = module.bastion.security_group_id
-  
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
   tags = var.tags
 }
 
-# Group 2: Business Domain Services (Item, Search, Reservation)
 module "compute_prod_business" {
   source = "../modules/compute"
-  count  = var.env == "prod" ? 1 : 0
+  count  = local.is_prod ? 1 : 0
 
-  name          = "${local.name}-group-business"
+  name          = "${local.name}-business"
   environment   = var.env
-  role_name     = "biz-svcs"
+  role_name     = "prod-business"
   instance_type = "t3.medium"
-  
+
   vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
-  bastion_sg_id      = module.bastion.security_group_id
-  
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
   tags = var.tags
 }
 
-# Group 3: Operations & Logistics (Delivery, Notification, Reputation)
 module "compute_prod_ops" {
   source = "../modules/compute"
-  count  = var.env == "prod" ? 1 : 0
+  count  = local.is_prod ? 1 : 0
 
-  name          = "${local.name}-group-ops"
+  name          = "${local.name}-ops"
   environment   = var.env
-  role_name     = "ops-svcs"
+  role_name     = "prod-ops"
   instance_type = "t3.medium"
-  
+
   vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
-  bastion_sg_id      = module.bastion.security_group_id
-  
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+module "compute_prod_realtime" {
+  source = "../modules/compute"
+  count  = local.is_prod ? 1 : 0
+
+  name          = "${local.name}-realtime"
+  environment   = var.env
+  role_name     = "prod-realtime"
+  instance_type = "t3.medium"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
+  tags = var.tags
+}
+
+module "compute_prod_middleware" {
+  source = "../modules/compute"
+  count  = local.is_prod ? 1 : 0
+
+  name          = "${local.name}-middleware"
+  environment   = var.env
+  role_name     = "prod-middleware"
+  instance_type = "t3.large"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id          = module.bastion.security_group_id
+  alb_sg_id              = null
+  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name  = var.instance_profile_name
+
   tags = var.tags
 }
 
 # ==============================================================================
-# 3. DATA & STORAGE LAYER
+# 4. DATA & STORAGE LAYER
 # ==============================================================================
 
-# S3 Media Bucket
 module "media_bucket" {
   source = "../modules/s3_media_bucket"
-
-  # FIXED: Renamed 'name_prefix' to 'name' to match the new module definition.
-  # The module will automatically append "-media-xxxx" to this name.
-  name = local.name
-
-  tags = var.tags
+  name   = local.name
+  tags   = var.tags
 }
 
-# RDS Postgres Database
+# RDS in QA and PROD (NOT in dev)
 module "database" {
   source = "../modules/data_rds_postgres"
-
-  # CRITICAL: Only create RDS in PROD environment to save costs.
-  # If var.env is "dev" or "qa", this evaluates to 0 (do not create).
-  count = var.env == "prod" ? 1 : 0
+  count  = var.env != "dev" ? 1 : 0
 
   name               = local.name
   vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  # Note: 'allowed_sg_ids' and 'allowed_cidr_blocks' were removed 
-  # because the updated module handles security internally.
-
-  db_name     = var.db_name
-  db_username = var.db_username
-
+  db_name        = var.db_name
+  db_username    = var.db_username
+  db_password    = var.db_password
   instance_class = var.db_instance_class
   engine_version = var.db_engine_version
 
@@ -165,53 +314,159 @@ module "database" {
 }
 
 # ==============================================================================
-# 4. LOAD BALANCING (PROD ONLY) - "The AWS API Gateway"
+# 5. ALB ROUTING RULES (API Gateway behavior)
+# We keep it simple: 1 target group per host.
 # ==============================================================================
 
-resource "aws_lb" "main" {
-  # STOP: Only create ALB in PROD to save $$ in Academy
-  count = var.env == "prod" ? 1 : 0
+# Default TG from module ALB will be used as CORE TG
+resource "aws_lb_target_group_attachment" "default_core_attach" {
+  count = local.has_alb ? 1 : 0
 
-  name               = "${local.name}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [module.bastion.security_group_id] # Ojo: Necesitas un SG para Web (Port 80)
-  subnets            = module.network.public_subnet_ids
+  target_group_arn = module.alb[0].target_group_arn
+  target_id        = local.is_qa ? module.compute_qa_core[0].instance_id : module.compute_prod_core[0].instance_id
+  port             = 80
+}
+
+# Extra target groups
+resource "aws_lb_target_group" "tg_business" {
+  count    = local.has_alb ? 1 : 0
+  name     = "${local.name}-tg-business"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = module.network.vpc_id
+
+  health_check {
+    enabled             = true
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
 
   tags = var.tags
 }
 
-resource "aws_lb_listener" "http" {
-  count = var.env == "prod" ? 1 : 0
+resource "aws_lb_target_group" "tg_ops" {
+  count    = local.has_alb ? 1 : 0
+  name     = "${local.name}-tg-ops"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = module.network.vpc_id
 
-  load_balancer_arn = aws_lb.main[0].arn
-  port              = "80"
-  protocol          = "HTTP"
+  health_check {
+    enabled             = true
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
 
-  default_action {
-    type = "fixed-response"
-    fixed_response {
-      content_type = "text/plain"
-      message_body = "404: Not Found - CampusTrade API"
-      status_code  = "404"
+  tags = var.tags
+}
+
+resource "aws_lb_target_group" "tg_realtime" {
+  count    = local.has_alb ? 1 : 0
+  name     = "${local.name}-tg-realtime"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = module.network.vpc_id
+
+  health_check {
+    enabled             = true
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = var.tags
+}
+
+# Attachments for the extra TGs
+resource "aws_lb_target_group_attachment" "business_attach" {
+  count = local.has_alb ? 1 : 0
+
+  target_group_arn = aws_lb_target_group.tg_business[0].arn
+  target_id        = local.is_qa ? module.compute_qa_business[0].instance_id : module.compute_prod_business[0].instance_id
+  port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "ops_attach" {
+  count = local.has_alb ? 1 : 0
+
+  target_group_arn = aws_lb_target_group.tg_ops[0].arn
+  target_id        = local.is_qa ? module.compute_qa_ops[0].instance_id : module.compute_prod_ops[0].instance_id
+  port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "realtime_attach" {
+  count = local.has_alb ? 1 : 0
+
+  target_group_arn = aws_lb_target_group.tg_realtime[0].arn
+  target_id        = local.is_qa ? module.compute_qa_realtime[0].instance_id : module.compute_prod_realtime[0].instance_id
+  port             = 80
+}
+
+# Listener rules (path-based routing)
+resource "aws_lb_listener_rule" "rule_business" {
+  count        = local.has_alb ? 1 : 0
+  listener_arn = module.alb[0].listener_arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_business[0].arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/items*", "/search*", "/reservations*"]
     }
   }
 }
 
-# ------------------------------------------------------------------------------
-# REGLAS DE ENRUTAMIENTO (Aquí ocurre la magia del "API Gateway")
-# ------------------------------------------------------------------------------
+resource "aws_lb_listener_rule" "rule_ops" {
+  count        = local.has_alb ? 1 : 0
+  listener_arn = module.alb[0].listener_arn
+  priority     = 30
 
-# Regla 1: Tráfico de Usuarios -> Grupo A (Core)
-resource "aws_lb_target_group" "tg_core" {
-  count    = var.env == "prod" ? 1 : 0
-  name     = "${local.name}-tg-core"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = module.network.vpc_id
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_ops[0].arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/delivery*", "/reputation*", "/traceability*"]
+    }
+  }
 }
-# Aquí faltaría el "aws_lb_listener_rule" para decir:
-# IF path == /api/auth/* THEN forward to tg_core
 
-# ... (Repetir para Business y Ops)
+resource "aws_lb_listener_rule" "rule_realtime" {
+  count        = local.has_alb ? 1 : 0
+  listener_arn = module.alb[0].listener_arn
+  priority     = 40
 
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_realtime[0].arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/chat*"]
+    }
+  }
+}

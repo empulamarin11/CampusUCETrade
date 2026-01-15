@@ -1,5 +1,3 @@
-
-
 variable "name" {
   description = "Base name for resources"
   type        = string
@@ -11,13 +9,18 @@ variable "environment" {
 }
 
 variable "role_name" {
-  description = "Role of this node (e.g., all-in-one, core-svcs, worker)"
+  description = "Role of this node (e.g., qa-core, qa-business, prod-ops)"
   type        = string
   default     = "general"
 }
 
 variable "vpc_id" {
   description = "VPC ID where the instance will reside"
+  type        = string
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR for internal traffic rules (avoid hardcoding 10.0.0.0/16)"
   type        = string
 }
 
@@ -31,6 +34,12 @@ variable "bastion_sg_id" {
   type        = string
 }
 
+variable "alb_sg_id" {
+  description = "ALB Security Group ID to allow HTTP ingress (port 80) from ALB to this instance"
+  type        = string
+  default     = null
+}
+
 variable "instance_type" {
   description = "EC2 Instance Type (e.g., t3.micro, t3.medium)"
   type        = string
@@ -40,11 +49,11 @@ variable "instance_type" {
 variable "ssh_key_name" {
   description = "Name of the SSH Key Pair to use"
   type        = string
-  default     = null 
+  default     = null
 }
 
 variable "instance_profile_name" {
-  description = "IAM Instance Profile to attach (for ECR access, etc.)"
+  description = "IAM Instance Profile to attach (for ECR/GHCR pulls, SSM, etc.)"
   type        = string
   default     = "LabInstanceProfile" # Default for AWS Academy
 }

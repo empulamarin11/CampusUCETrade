@@ -1,7 +1,5 @@
-
 # ------------------------------------------------------------------------------
-# 1. DB SUBNET GROUP
-# Tells RDS which subnets it can use (Must be Private Subnets)
+# 1. DB SUBNET GROUP (Private subnets only)
 # ------------------------------------------------------------------------------
 resource "aws_db_subnet_group" "this" {
   name       = "${var.name}-db-subnet-group"
@@ -13,21 +11,19 @@ resource "aws_db_subnet_group" "this" {
 }
 
 # ------------------------------------------------------------------------------
-# 2. SECURITY GROUP
-# Allows traffic to Port 5432 (Postgres) from within the VPC
+# 2. SECURITY GROUP (Allow Postgres only from inside the VPC)
 # ------------------------------------------------------------------------------
-resource "aws_security_group" "rds_sg" {
-  name        = "${var.name}-rds-sg"
-  description = "Allow PostgreSQL traffic from VPC"
+resource "aws_security_group" "db_sg" {
+  name        = "${var.name}-db-sg"
+  description = "RDS PostgreSQL security group"
   vpc_id      = var.vpc_id
 
-  # Inbound: Allow connection from any internal IP (App Nodes)
   ingress {
+    description = "PostgreSQL from VPC"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"] # Assuming this is your VPC CIDR
-    description = "PostgreSQL access from VPC"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   egress {
@@ -37,7 +33,9 @@ resource "aws_security_group" "rds_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    Name = "${var.name}-db-sg"
+  })
 }
 
 # ------------------------------------------------------------------------------
@@ -45,30 +43,34 @@ resource "aws_security_group" "rds_sg" {
 # ------------------------------------------------------------------------------
 resource "aws_db_instance" "this" {
   identifier = "${var.name}-postgres"
-  
-  # Engine
+
   engine         = "postgres"
   engine_version = var.engine_version
+
   instance_class = var.instance_class
 
-  # Storage
-  allocated_storage     = 20
-  max_allocated_storage = 50 # Autoscaling storage cap
-  storage_type          = "gp2"
+  allocated_storage = var.allocated_storage
+  storage_type       = "gp3"
 
-  # Credentials
   db_name  = var.db_name
   username = var.db_username
   password = var.db_password
 
-  # Networking
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
   db_subnet_group_name   = aws_db_subnet_group.this.name
-  vpc_security_group_ids = [aws_security_group.rds_sg.id]
-  publicly_accessible    = false # SECURITY: Never expose DB to internet
 
-  # Maintenance & Backups (Optimized for Academy/Dev)
-  skip_final_snapshot = true  # CRITICAL for Academy (avoids destroy errors)
-  deletion_protection = false 
-  
-  tags = var.tags
+  publicly_accessible = var.publicly_accessible
+  multi_az            = var.multi_az
+
+  skip_final_snapshot = true
+  deletion_protection = false
+
+  backup_retention_period = 7
+  backup_window           = "03:00-04:00"
+
+  maintenance_window = "sun:05:00-sun:06:00"
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-postgres"
+  })
 }
