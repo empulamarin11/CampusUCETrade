@@ -1,16 +1,15 @@
 # Chat-Service
 
 ## 1. Service Overview
-Enables real-time communication between buyers and sellers to negotiate trades.
+The **Chat-Service** enables real-time communication between users involved in a trade/reservation flow.
 
 ## 2. Applied Architecture
-* **Architectural Pattern:** **Layered Architecture** (Chosen - Blue).
-* **Justification:** Simplifies the management of message history and active connection states.
+- **Architecture:** Layered Architecture
+- **Justification:** Separates real-time connection handling from message logic and persistence concerns.
 
 ## 3. Communication Methods
-* **Protocol:** **Websockets** (Chosen - Blue).
-* **Justification:** Required for instant, bidirectional messaging, ensuring a smooth user experience without polling.
+- **Protocol:** WebSocket
+- **Justification:** WebSocket supports real-time, bidirectional communication without polling.
 
-## 4. Design Principles
-* **Low Coupling:** The chat system functions independently of the trade or reservation logic.
-* **Encapsulation:** Individual chat rooms and message states are isolated and secured within the service's domain.
+## 4. Design Principle
+- **KISS:** Keep the real-time messaging flow simple and stable to reduce operational complexity.

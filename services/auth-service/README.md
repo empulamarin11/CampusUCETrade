@@ -1,24 +1,18 @@
 # Auth-Service
 
 ## 1. Service Overview
-The **Auth-Service** is responsible for identity management, authentication, and authorization within the **CampusUceTrade** ecosystem.
+The **Auth-Service** handles authentication and authorization for the CampusUCETrade platform. It issues and validates **JWT** access tokens and enforces security rules for protected endpoints.
 
 ## 2. Applied Architecture
-* **Architectural Pattern:** Microservices (Mandatory - Red) + **Hexagonal Architecture** (Chosen - Blue).
-* **Justification:** Hexagonal Architecture was implemented to decouple the security domain logic (token generation, credential validation) from infrastructure details like the **Supabase** PaaS. This ensures the business logic remains testable and independent of external tools.
-* **Implementation:** * `src/domain`: Contains user entities and repository interfaces (Ports).
-    * `src/application`: Handles use cases like `LoginUser` and `ValidateToken`.
-    * `src/infrastructure`: Contains adapters for Supabase integration and JWT services.
+- **Architecture:** Hexagonal Architecture (Ports & Adapters)
+- **Justification:** Keeps authentication domain logic (token generation/validation, credential checks) independent from infrastructure (database, frameworks), making it easier to test and maintain.
 
 ## 3. Communication Methods
-* **Protocol:** **REST API** (Chosen - Blue).
-* **Justification:** REST is the industry standard for synchronous authentication processes where the client requires an immediate response (JWT) to proceed.
-* **Implementation:** NestJS controllers exposing endpoints such as `POST /auth/login` and `POST /auth/register`.
+- **Protocol:** REST API
+- **Justification:** Authentication requires immediate synchronous responses (e.g., token issuance).
 
-## 4. Design Principles
-* **SOLID (Dependency Inversion):** High-level application logic depends on abstractions (interfaces), not on low-level Supabase implementation.
-* **Encapsulation:** Security-sensitive logic and secrets are restricted to this microservice; no other service has direct access to the identity database.
+## 4. Design Principle
+- **SOLID (Dependency Inversion - DIP):** Core use cases depend on abstractions (ports/interfaces), not on concrete infrastructure implementations.
 
-## 5. PaaS Integration
-* **Tool:** **Supabase**.
-* **Justification:** Used to manage user records and secure profile storage, fulfilling the "Use AWS and any PAaS" requirement (Point 6).
+## 5. Notes
+- Exposes health endpoint for infrastructure validation (e.g., `/health`).

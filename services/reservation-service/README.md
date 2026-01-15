@@ -1,17 +1,15 @@
 # Reservation-Service
 
 ## 1. Service Overview
-Handles the booking lifecycle for campus trades and item exchanges.
+The **Reservation-Service** manages reservation lifecycles for item exchanges, including status transitions and reservation rules.
 
 ## 2. Applied Architecture
-* **Architectural Pattern:** **Event-Driven Architecture** (Mandatory - Red).
-* **Justification:** Reservations trigger multiple side effects (notifications, stock updates). An event-driven approach prevents the system from being blocked by synchronous calls.
+- **Architecture:** Event-Driven Architecture
+- **Justification:** Reservations trigger side effects (notifications, audit, downstream processes). Publishing events avoids blocking the main flow with synchronous dependencies.
 
 ## 3. Communication Methods
-* **Protocol:** **RabbitMQ** (Mandatory - Red).
-* **Justification:** Used as the message broker to publish events like `ReservationCreated`. This allows asynchronous processing and high availability.
-* **Implementation:** Integration with RabbitMQ using the NestJS Microservices module.
+- **Protocol:** RabbitMQ
+- **Justification:** RabbitMQ enables reliable asynchronous event distribution (e.g., `ReservationCreated`) to multiple consumers.
 
-## 4. Design Principles
-* **Low Coupling:** The Reservation-Service does not need to know about the Notification or Item services; it simply broadcasts events to the broker.
-* **SOLID (Open/Closed):** New features (like a loyalty system) can be added by simply subscribing to existing events without modifying the Reservation-Service code.
+## 4. Design Principle
+- **Low Coupling:** The service publishes events without knowing which downstream services will handle them.

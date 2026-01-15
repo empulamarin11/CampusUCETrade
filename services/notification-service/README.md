@@ -1,20 +1,18 @@
 # Notification-Service
 
 ## 1. Service Overview
-Centralizes all outbound communications (Email, Push, SMS) triggered by system events.
+The **Notification-Service** centralizes outbound notifications (email/push/SMS) triggered by platform activity.
 
 ## 2. Applied Architecture
-* **Architectural Pattern:** **Event-Driven Architecture** (Mandatory - Red).
-* **Justification:** Notifications are inherently reactive. This service waits for events to occur in other parts of the system to trigger specific alerts.
+- **Architecture:** Event-Driven Architecture
+- **Justification:** Notifications are reactive by nature. This service responds to events and triggers delivery workflows.
 
 ## 3. Communication Methods
-* **Protocols:** **RabbitMQ** (Mandatory - Red) + **Webhooks** (Chosen - Blue).
-* **Justification:** It consumes events from **RabbitMQ** and uses **Webhooks** to integrate with **n8n** for advanced workflow automation.
+- **Protocol:** Webhooks
+- **Justification:** Webhooks provide a simple integration channel to automation tools (n8n) to execute notification workflows.
 
-## 4. Design Principles
-* **DRY (Don't Repeat Yourself):** Uses shared notification templates and logic stored in the monorepo's shared packages.
-* **KISS:** Focuses only on the delivery of messages, not on the business logic that triggered them.
+## 4. Design Principle
+- **DRY:** Shared templates and reusable notification logic reduce duplication across different notification types.
 
-## 5. Automation Integration
-* **Tool:** **n8n**.
-* **Justification:** Fulfils requirement #20 by using n8n to automate complex business processes, such as sending stylized PDF reports via email after a trade.
+## 5. n8n Integration
+- **Where n8n is applied:** This service calls **n8n via Webhooks** to execute automated workflows (e.g., email formatting, chained actions, reporting).
