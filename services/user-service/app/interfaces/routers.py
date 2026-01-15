@@ -18,7 +18,7 @@ class RegisterIn(BaseModel):
 async def health():
     return {"status": "ok"}
 
-@router.post("/users/register")
+@router.post("/register")
 def register(payload: RegisterIn, db: Session = Depends(get_db)):
     repo = SqlAlchemyUserRepository(db)
     hasher = BcryptHasher()

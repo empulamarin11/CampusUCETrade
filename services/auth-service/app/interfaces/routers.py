@@ -26,7 +26,7 @@ class ValidateOut(BaseModel):
 async def health():
     return {"status": "ok"}
 
-@router.post("/auth/login", response_model=TokenOut, dependencies=[Depends(RateLimiter(times=10, seconds=60))])
+@router.post("/login", response_model=TokenOut, dependencies=[Depends(RateLimiter(times=10, seconds=60))])
 def login(payload: LoginIn, db: Session = Depends(get_db)):
     repo = SqlAlchemyUserRepository(db)
     hasher = BcryptHasher()
