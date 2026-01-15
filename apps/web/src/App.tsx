@@ -21,5 +21,5 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
       </Routes>
     </div>
-  );
+  )
 }

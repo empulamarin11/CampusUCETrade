@@ -18,6 +18,13 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: campus-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
 
   user-service:
     build:
@@ -44,6 +51,38 @@ services:
       - redis
     ports:
       - "8001:8000"
+
+  item-service:
+    build:
+      context: ./services/item-service
+    container_name: campus-item-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - SERVICE_ROOT_PATH=/items
+    depends_on:
+      - postgres
+    ports:
+      - "8003:8000"  
+
+  reservation-service:
+    build:
+      context: ./services/reservation-service
+    container_name: campus-reservation-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - SERVICE_ROOT_PATH=/reservations
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=campus.events
+      - RABBITMQ_EXCHANGE_TYPE=topic
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "8004:8000"
 
 volumes:
   campus_pgdata:

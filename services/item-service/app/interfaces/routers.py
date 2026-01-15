@@ -9,8 +9,8 @@ from jose import jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.models import Item
+from app.infrastructure.db import get_db
+from app.infrastructure.models import Item
 
 router = APIRouter()
 

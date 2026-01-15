@@ -1,9 +1,9 @@
 import os
 from fastapi import FastAPI
 
-from app.routers import router
-from app.db import Base, engine
-from app.models import Item  # noqa: F401
+from app.interfaces.routers import router
+from app.infrastructure.db import Base, engine
+from app.infrastructure.models import Item  # noqa: F401
 
 SERVICE_NAME = "item-service"
 
