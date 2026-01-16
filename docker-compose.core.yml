@@ -26,6 +26,21 @@ services:
       - "15672:15672"
     restart: unless-stopped
 
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: campus-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_HOST=localhost
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=America/Guayaquil
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
   user-service:
     build:
       context: ./services/user-service
@@ -83,6 +98,28 @@ services:
       - rabbitmq
     ports:
       - "8004:8000"
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: campus-notification-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - SERVICE_ROOT_PATH=/notifications
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=campus.events
+      - RABBITMQ_QUEUE=q.notification
+      - RABBITMQ_BINDINGS=reservation.*
+      # n8n (optional for now)
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/campus-notify
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "8005:8000"
+
 
 volumes:
   campus_pgdata:
+  n8n_data:
