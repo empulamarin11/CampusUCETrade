@@ -1,0 +1,125 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus-postgres
+    environment:
+      POSTGRES_DB: campusuce
+      POSTGRES_USER: campusuce
+      POSTGRES_PASSWORD: campusuce123
+    ports:
+      - "5432:5432"
+    volumes:
+      - campus_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: campus-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: campus-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: campus-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_HOST=localhost
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=America/Guayaquil
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./services/user-service
+    container_name: campus-user-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+    depends_on:
+      - postgres
+    ports:
+      - "8002:8000"
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: campus-auth-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8001:8000"
+
+  item-service:
+    build:
+      context: ./services/item-service
+    container_name: campus-item-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - SERVICE_ROOT_PATH=/items
+    depends_on:
+      - postgres
+    ports:
+      - "8003:8000"  
+
+  reservation-service:
+    build:
+      context: ./services/reservation-service
+    container_name: campus-reservation-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - SERVICE_ROOT_PATH=/reservations
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=campus.events
+      - RABBITMQ_EXCHANGE_TYPE=topic
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "8004:8000"
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: campus-notification-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - SERVICE_ROOT_PATH=/notifications
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=campus.events
+      - RABBITMQ_QUEUE=q.notification
+      - RABBITMQ_BINDINGS=reservation.*
+      # n8n (optional for now)
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/campus-notify
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "8005:8000"
+
+
+volumes:
+  campus_pgdata:
+  n8n_data:

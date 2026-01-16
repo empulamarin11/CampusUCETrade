@@ -4,6 +4,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
+from app.infrastructure.webhook_client import send_to_n8n
 
 import pika
 from sqlalchemy.orm import Session
@@ -69,6 +70,7 @@ def _on_message(ch, method, properties, body):
     db = SessionLocal()
     try:
         _create_notification_from_event(db, event)
+        send_to_n8n(event)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception:
         # If DB fails, requeue could cause infinite loops; keep it simple for MVP:

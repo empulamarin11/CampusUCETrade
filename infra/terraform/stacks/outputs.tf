@@ -1,54 +1,111 @@
-# infra/terraform/stacks/outputs.tf
+# ==============================================================================
+# NETWORK
+# ==============================================================================
+
+output "vpc_id" {
+  value = module.network.vpc_id
+}
+
+output "public_subnet_ids" {
+  value = module.network.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  value = module.network.private_subnet_ids
+}
 
 # ==============================================================================
-# CONNECTION DETAILS
+# BASTION
 # ==============================================================================
 
 output "bastion_public_ip" {
-  description = "Public IP of the Bastion Host (Jumpbox). SSH here first."
-  value       = module.bastion.public_ip
+  value = module.bastion.public_ip
 }
 
-output "ssh_command_example" {
-  description = "Copy-paste command to connect to Bastion"
-  # FIX: Handle null key name safely
-  value       = "ssh -i ${var.ssh_key_name != null ? var.ssh_key_name : "${var.project}-${var.env}-svc-key"}.pem ubuntu@${module.bastion.public_ip}"
+output "bastion_security_group_id" {
+  value = module.bastion.security_group_id
 }
 
 # ==============================================================================
-# QA ENVIRONMENT OUTPUTS
+# ALB (acts as API Gateway)
 # ==============================================================================
 
-output "qa_node_private_ip" {
-  description = "Private IP of the All-in-One QA Node (Connect via Bastion)"
-  value       = length(module.compute_qa_all_in_one) > 0 ? module.compute_qa_all_in_one[0].private_ip : null
+output "alb_dns" {
+  value = var.env != "dev" ? module.alb[0].alb_dns_name : null
+}
+
+output "alb_security_group_id" {
+  value = var.env != "dev" ? module.alb[0].alb_sg_id : null
 }
 
 # ==============================================================================
-# PROD ENVIRONMENT OUTPUTS
+# QA COMPUTE (private IPs)
 # ==============================================================================
 
-output "prod_core_ips" {
-  description = "Private IPs of Core Group (Auth/User)"
-  value       = length(module.compute_prod_core) > 0 ? module.compute_prod_core[0].private_ip : null
+output "qa_core_private_ip" {
+  value = var.env == "qa" ? module.compute_qa_core[0].private_ip : null
 }
 
-output "prod_business_ips" {
-  description = "Private IPs of Business Group (Item/Search)"
-  value       = length(module.compute_prod_business) > 0 ? module.compute_prod_business[0].private_ip : null
+output "qa_business_private_ip" {
+  value = var.env == "qa" ? module.compute_qa_business[0].private_ip : null
 }
 
-output "prod_ops_ips" {
-  description = "Private IPs of Ops Group (Delivery/Notif)"
-  value       = length(module.compute_prod_ops) > 0 ? module.compute_prod_ops[0].private_ip : null
+output "qa_ops_private_ip" {
+  value = var.env == "qa" ? module.compute_qa_ops[0].private_ip : null
+}
+
+output "qa_realtime_private_ip" {
+  value = var.env == "qa" ? module.compute_qa_realtime[0].private_ip : null
+}
+
+output "qa_middleware_private_ip" {
+  value = var.env == "qa" ? module.compute_qa_middleware[0].private_ip : null
 }
 
 # ==============================================================================
-# DATABASE OUTPUTS
+# PROD COMPUTE (private IPs)
 # ==============================================================================
 
-output "db_endpoint" {
-  description = "RDS Endpoint (Only available in PROD)"
-  # ✅ CORRECCIÓN: Usar índice [0] si existe, si no, null.
-  value       = length(module.database) > 0 ? module.database[0].db_endpoint : null
+output "prod_core_private_ip" {
+  value = var.env == "prod" ? module.compute_prod_core[0].private_ip : null
+}
+
+output "prod_business_private_ip" {
+  value = var.env == "prod" ? module.compute_prod_business[0].private_ip : null
+}
+
+output "prod_ops_private_ip" {
+  value = var.env == "prod" ? module.compute_prod_ops[0].private_ip : null
+}
+
+output "prod_realtime_private_ip" {
+  value = var.env == "prod" ? module.compute_prod_realtime[0].private_ip : null
+}
+
+output "prod_middleware_private_ip" {
+  value = var.env == "prod" ? module.compute_prod_middleware[0].private_ip : null
+}
+
+# ==============================================================================
+# RDS POSTGRES
+# ==============================================================================
+
+output "rds_endpoint" {
+  value = (var.env != "dev" && length(module.database) > 0) ? module.database[0].db_endpoint : null
+}
+
+output "rds_port" {
+  value = (var.env != "dev" && length(module.database) > 0) ? module.database[0].db_port : null
+}
+
+output "rds_db_name" {
+  value = (var.env != "dev" && length(module.database) > 0) ? module.database[0].db_name : null
+}
+
+# ==============================================================================
+# S3 MEDIA BUCKET
+# ==============================================================================
+
+output "media_bucket_name" {
+  value = module.media_bucket.bucket_id
 }

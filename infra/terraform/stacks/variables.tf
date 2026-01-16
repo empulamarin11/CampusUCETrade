@@ -128,5 +128,5 @@ variable "db_instance_class" {
 
 variable "db_engine_version" {
   type    = string
-  default = "16.1"
+  default = "16.11"
 }

@@ -1,48 +1,67 @@
-
 variable "name" {
-  description = "Base name for resources"
+  description = "Base name for RDS resources"
   type        = string
 }
 
 variable "vpc_id" {
-  description = "VPC ID where the RDS will be deployed"
+  description = "VPC ID where RDS will be deployed"
+  type        = string
+}
+
+variable "vpc_cidr" {
+  description = "VPC CIDR allowed to access Postgres (avoid hardcode 10.0.0.0/16)"
   type        = string
 }
 
 variable "private_subnet_ids" {
-  description = "List of private subnet IDs for the DB Subnet Group"
+  description = "Private subnets for DB subnet group"
   type        = list(string)
 }
 
 variable "db_name" {
-  description = "Name of the database to create"
+  description = "Database name"
   type        = string
-  default     = "campus_trade_db"
 }
 
 variable "db_username" {
-  description = "Master username"
+  description = "Database username"
   type        = string
-  default     = "postgres"
 }
 
 variable "db_password" {
-  description = "Master password (should be sensitive in real prod)"
+  description = "Database password"
   type        = string
-  default     = "ChangeMe123!" # In real life, use AWS Secrets Manager
   sensitive   = true
 }
 
 variable "instance_class" {
-  description = "RDS Instance Class"
+  description = "RDS instance class (e.g., db.t3.micro)"
   type        = string
-  default     = "db.t3.micro" # Cheapest option for Academy
+  default     = "db.t3.micro"
 }
 
 variable "engine_version" {
-  description = "PostgreSQL Engine Version"
+  description = "Postgres engine version"
   type        = string
-  default     = "16.3" # FIXED: Changed from 16.1 to 16.3 to avoid AWS errors
+  default     = "16.3"
+}
+
+variable "allocated_storage" {
+  description = "Allocated storage (GiB)"
+  type        = number
+  default     = 20
+}
+
+variable "multi_az" {
+  description = "Enable Multi-AZ (recommended for PROD)"
+  type        = bool
+  default     = false
+}
+
+variable "publicly_accessible" {
+  description = "Whether DB is publicly accessible (should be false)"
+  type        = bool
+  default     = false
 }
 
 variable "tags" {

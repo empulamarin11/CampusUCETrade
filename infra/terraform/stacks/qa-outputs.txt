@@ -1,0 +1,22 @@
+alb_dns = "campusuce-trade-qa-alb-227737547.us-east-1.elb.amazonaws.com"
+alb_security_group_id = "sg-0ac1a9708c53d2bb1"
+bastion_public_ip = "54.197.28.23"
+bastion_security_group_id = "sg-0022dc047b2d9a623"
+media_bucket_name = "campusuce-trade-qa-media-ad9a91e8"
+private_subnet_ids = [
+  "subnet-01946285b4aebf875",
+  "subnet-0dee7175f851cb6ed",
+]
+public_subnet_ids = [
+  "subnet-0d36b0f58e6a2f11c",
+  "subnet-07a1a2dea3e435a92",
+]
+qa_business_private_ip = "10.0.4.157"
+qa_core_private_ip = "10.0.4.46"
+qa_middleware_private_ip = "10.0.4.150"
+qa_ops_private_ip = "10.0.4.141"
+qa_realtime_private_ip = "10.0.4.248"
+rds_db_name = "campusuce"
+rds_endpoint = "campusuce-trade-qa-postgres.cfy8cv49icv0.us-east-1.rds.amazonaws.com:5432"
+rds_port = 5432
+vpc_id = "vpc-05fbf3ec020f2676b"

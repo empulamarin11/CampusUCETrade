@@ -1,5 +1,3 @@
-
-
 # ------------------------------------------------------------------------------
 # 1. SECURITY GROUP
 # Controls traffic to the Application Node
@@ -18,13 +16,25 @@ resource "aws_security_group" "app_sg" {
     description     = "SSH from Bastion"
   }
 
-  # Inbound: Internal VPC Traffic 
+  # Inbound: HTTP from ALB (only if alb_sg_id is provided)
+  dynamic "ingress" {
+    for_each = var.alb_sg_id != null ? [1] : []
+    content {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      security_groups = [var.alb_sg_id]
+      description     = "HTTP from ALB"
+    }
+  }
+
+  # Inbound: Internal VPC traffic
   # (Allows microservices to talk to each other and the DB on any port)
   ingress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["10.0.0.0/16"] # Adjust if your VPC CIDR is different
+    cidr_blocks = [var.vpc_cidr]
     description = "Internal VPC Traffic"
   }
 
@@ -58,16 +68,25 @@ data "aws_ami" "ubuntu" {
 }
 
 # ------------------------------------------------------------------------------
-# 3. EC2 INSTANCE (Docker Host)
+# 3. SUBNET SELECTION
+# Distribute instances across private subnets (Multi-AZ friendly)
+# ------------------------------------------------------------------------------
+locals {
+  subnet_index = length(var.private_subnet_ids) > 1 ? (parseint(substr(md5(var.role_name), 0, 2), 16) % length(var.private_subnet_ids)) : 0
+  chosen_subnet_id = element(var.private_subnet_ids, local.subnet_index)
+}
+
+# ------------------------------------------------------------------------------
+# 4. EC2 INSTANCE (Docker Host)
 # ------------------------------------------------------------------------------
 resource "aws_instance" "app_node" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
-  
+
   # Networking
-  subnet_id                   = var.private_subnet_ids[0] # Deploy in first private subnet
+  subnet_id                   = local.chosen_subnet_id
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  associate_public_ip_address = false # IT IS PRIVATE (Secure)
+  associate_public_ip_address = false
 
   # Access & Identity
   key_name             = var.ssh_key_name
@@ -79,8 +98,9 @@ resource "aws_instance" "app_node" {
   # ----------------------------------------------------------------------------
   user_data = <<-EOF
               #!/bin/bash
+              set -e
               echo "Initializing ${var.role_name} node..."
-              
+
               # 1. Install prerequisites
               apt-get update -y
               apt-get install -y ca-certificates curl gnupg lsb-release
@@ -92,15 +112,15 @@ resource "aws_instance" "app_node" {
               # 3. Set up the repository
               echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-              # 4. Install Docker Engine
+              # 4. Install Docker Engine + Compose plugin
               apt-get update -y
               apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-              # 5. Post-installation steps (Allow ubuntu user to run docker)
-              usermod -aG docker ubuntu
+              # 5. Post-install steps
+              usermod -aG docker ubuntu || true
               systemctl enable docker
               systemctl start docker
-              
+
               echo "Docker installed successfully."
               EOF
 
