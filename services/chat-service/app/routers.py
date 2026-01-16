@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db import get_db, SessionLocal
 from app.models import ChatMessage
 
 router = APIRouter(tags=["chat"])
@@ -120,7 +120,7 @@ async def websocket_endpoint(
 
             # We open a short DB session inside the WS loop
             # to avoid keeping a Session tied to the socket lifetime.
-            db = next(get_db())
+            db = SessionLocal()
             try:
                 row = ChatMessage(
                     id=msg_id,
