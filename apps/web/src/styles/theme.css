@@ -1,0 +1,16 @@
+:root{
+  --card: rgba(255,255,255,.08);
+  --stroke: rgba(255,255,255,.12);
+  --text: #e5e7eb;
+  --muted: rgba(229,231,235,.75);
+  --brand: #3b82f6;
+}
+.bg{
+  position:fixed; inset:0;
+  background:
+    radial-gradient(900px 400px at 20% 10%, rgba(59,130,246,.25), transparent 60%),
+    radial-gradient(700px 350px at 90% 20%, rgba(245,158,11,.18), transparent 55%),
+    radial-gradient(900px 500px at 50% 95%, rgba(34,197,94,.12), transparent 60%),
+    #070a12;
+  pointer-events:none;
+}
