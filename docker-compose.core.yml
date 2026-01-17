@@ -64,6 +64,31 @@ services:
       - ./docker/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: campus-zookeeper
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: campus-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+
   user-service:
     build:
       context: ./services/user-service
@@ -213,6 +238,24 @@ services:
       - postgres
     ports:
       - "8009:8000"
+
+  traceability-service:
+    build:
+      context: ./services/traceability-service
+    container_name: campus-traceability-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/traceability
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=campus.audit
+      - KAFKA_GROUP_ID=traceability-service
+    depends_on:
+      - postgres
+      - kafka
+    ports:
+      - "8010:8000"
 
 volumes:
   campus_pgdata:
