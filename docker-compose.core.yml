@@ -200,6 +200,20 @@ services:
     ports:
       - "8007:8016"
 
+  reputation-service:
+    build:
+      context: ./services/reputation-service
+    container_name: campus-reputation-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/reputation
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
+    ports:
+      - "8009:8000"
+
 volumes:
   campus_pgdata:
   n8n_data:
