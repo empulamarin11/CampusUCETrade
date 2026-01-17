@@ -8,11 +8,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from app.infrastructure.s3 import presign_get, presign_put
-
 
 from app.infrastructure.db import get_db
 from app.infrastructure.models import Item
+from app.infrastructure.s3 import presign_get, presign_put
 
 router = APIRouter()
 
@@ -46,6 +45,7 @@ class ItemOut(BaseModel):
     media_key: Optional[str] = None
     media_content_type: Optional[str] = None
 
+
 class MediaPresignOut(BaseModel):
     object_key: str
     upload_url: str
@@ -70,8 +70,25 @@ def health():
     return {"status": "ok", "service": "item-service"}
 
 
+def _to_item_out(r: Item) -> ItemOut:
+    return ItemOut(
+        id=r.id,
+        owner_email=r.owner_email,
+        title=r.title,
+        description=r.description,
+        price=float(r.price),
+        currency=r.currency,
+        media_key=getattr(r, "media_key", None),
+        media_content_type=getattr(r, "media_content_type", None),
+    )
+
+
 @router.post("/", response_model=ItemOut)
-def create_item(payload: ItemCreate, email: str = Depends(get_current_email), db: Session = Depends(get_db)):
+def create_item(
+    payload: ItemCreate,
+    email: str = Depends(get_current_email),
+    db: Session = Depends(get_db),
+):
     item_id = str(uuid4())
 
     item = Item(
@@ -86,31 +103,15 @@ def create_item(payload: ItemCreate, email: str = Depends(get_current_email), db
     )
     db.add(item)
     db.commit()
+    db.refresh(item)
 
-    return ItemOut(
-        id=item.id,
-        owner_email=item.owner_email,
-        title=item.title,
-        description=item.description,
-        price=float(item.price),
-        currency=item.currency,
-    )
+    return _to_item_out(item)
 
 
 @router.get("/", response_model=List[ItemOut])
 def list_items(db: Session = Depends(get_db)):
     rows = db.query(Item).order_by(Item.created_at.desc()).all()
-    return [
-        ItemOut(
-            id=r.id,
-            owner_email=r.owner_email,
-            title=r.title,
-            description=r.description,
-            price=float(r.price),
-            currency=r.currency,
-        )
-        for r in rows
-    ]
+    return [_to_item_out(r) for r in rows]
 
 
 @router.get("/{item_id}", response_model=ItemOut)
@@ -118,19 +119,16 @@ def get_item(item_id: str, db: Session = Depends(get_db)):
     r = db.get(Item, item_id)
     if not r:
         raise HTTPException(status_code=404, detail="Item not found")
-
-    return ItemOut(
-        id=r.id,
-        owner_email=r.owner_email,
-        title=r.title,
-        description=r.description,
-        price=float(r.price),
-        currency=r.currency,
-    )
+    return _to_item_out(r)
 
 
 @router.put("/{item_id}", response_model=ItemOut)
-def update_item(item_id: str, payload: ItemUpdate, email: str = Depends(get_current_email), db: Session = Depends(get_db)):
+def update_item(
+    item_id: str,
+    payload: ItemUpdate,
+    email: str = Depends(get_current_email),
+    db: Session = Depends(get_db),
+):
     r = db.get(Item, item_id)
     if not r:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -147,21 +145,19 @@ def update_item(item_id: str, payload: ItemUpdate, email: str = Depends(get_curr
         r.currency = payload.currency
 
     r.updated_at = datetime.utcnow()
+    db.add(r)
     db.commit()
     db.refresh(r)
 
-    return ItemOut(
-        id=r.id,
-        owner_email=r.owner_email,
-        title=r.title,
-        description=r.description,
-        price=float(r.price),
-        currency=r.currency,
-    )
+    return _to_item_out(r)
 
 
 @router.delete("/{item_id}")
-def delete_item(item_id: str, email: str = Depends(get_current_email), db: Session = Depends(get_db)):
+def delete_item(
+    item_id: str,
+    email: str = Depends(get_current_email),
+    db: Session = Depends(get_db),
+):
     r = db.get(Item, item_id)
     if not r:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -171,6 +167,7 @@ def delete_item(item_id: str, email: str = Depends(get_current_email), db: Sessi
     db.delete(r)
     db.commit()
     return {"deleted": True, "id": item_id}
+
 
 def _ext_from_content_type(ct: str) -> str:
     ct = ct.lower().strip()
@@ -208,6 +205,7 @@ def presign_item_media(
     item.updated_at = datetime.utcnow()
     db.add(item)
     db.commit()
+    db.refresh(item)
 
     return MediaPresignOut(
         object_key=key,

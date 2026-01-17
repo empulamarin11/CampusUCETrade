@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Item
+from app.s3 import presign_get
 
 router = APIRouter()
 
@@ -16,6 +17,8 @@ class SearchResult(BaseModel):
     title: str
     price: float
     currency: str
+    media_key: str | None = None
+    media_url: str | None = None
 
 
 @router.get("/health")
@@ -28,6 +31,7 @@ def search(
     q: Optional[str] = Query(default=None, description="Search query"),
     min_price: Optional[float] = Query(default=None, ge=0),
     max_price: Optional[float] = Query(default=None, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     filters = []
@@ -38,18 +42,28 @@ def search(
     if max_price is not None:
         filters.append(Item.price <= max_price)
 
-    query = db.query(Item)
+    query_db = db.query(Item)
     if filters:
-        query = query.filter(and_(*filters))
+        query_db = query_db.filter(and_(*filters))
 
-    rows = query.order_by(Item.created_at.desc()).limit(50).all()
+    rows = query_db.order_by(Item.created_at.desc()).limit(limit).all()
 
-    return [
-        SearchResult(
-            id=r.id,
-            title=r.title,
-            price=float(r.price),
-            currency=r.currency,
+    results: List[SearchResult] = []
+    for r in rows:
+        media_url = None
+        if getattr(r, "media_key", None):
+            # Presigned GET (works for MinIO local + AWS later)
+            media_url = presign_get(r.media_key, expires_in=900)
+
+        results.append(
+            SearchResult(
+                id=r.id,
+                title=r.title,
+                price=float(r.price),
+                currency=r.currency,
+                media_key=getattr(r, "media_key", None),
+                media_url=media_url,
+            )
         )
-        for r in rows
-    ]
+
+    return results
