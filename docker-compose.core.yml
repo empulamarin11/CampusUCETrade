@@ -55,6 +55,15 @@ services:
       - minio_data:/data
     restart: unless-stopped
 
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: campus-mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
   user-service:
     build:
       context: ./services/user-service
@@ -168,7 +177,28 @@ services:
       - postgres
       - minio
     ports:
-      - "8006:8000"
+      - "8008:8000"
+
+  delivery-service:
+    build:
+      context: ./services/delivery-service
+    container_name: campus-delivery-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/delivery
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - MQTT_HOST=mqtt
+      - MQTT_PORT=1883
+      - MQTT_CLIENT_ID=delivery-service
+      - TOPIC_CREATE=campus/delivery/create
+      - TOPIC_CONFIRM=campus/delivery/confirm
+      - TOPIC_DELIVERED=campus/delivery/delivered
+    depends_on:
+      - postgres
+      - mqtt
+    ports:
+      - "8007:8016"
 
 volumes:
   campus_pgdata:
