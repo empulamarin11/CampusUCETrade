@@ -8,7 +8,6 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,7 +16,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "pnpm"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -30,9 +28,8 @@ jobs:
           python-version: "3.11"
 
       - name: Install JS deps (root)
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
-      # Install Python deps per service if requirements.txt exists (simple for tomorrow)
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
