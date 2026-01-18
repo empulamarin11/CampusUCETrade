@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Dict, Set, List, Optional
+from typing import Dict, Set, List
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
