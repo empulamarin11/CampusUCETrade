@@ -15,74 +15,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (Academy)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Discover QA instance IPs by tags
+      - name: Install SSH key + known_hosts
+        env:
+          BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
         run: |
           set -e
-
-          get_private_ip () {
-            ROLE="$1"
-            aws ec2 describe-instances \
-              --filters "Name=tag:Role,Values=${ROLE}" "Name=instance-state-name,Values=running" \
-              --query "Reservations[0].Instances[0].PrivateIpAddress" \
-              --output text
-          }
-
-          get_public_ip () {
-            ROLE="$1"
-            aws ec2 describe-instances \
-              --filters "Name=tag:Role,Values=${ROLE}" "Name=instance-state-name,Values=running" \
-              --query "Reservations[0].Instances[0].PublicIpAddress" \
-              --output text
-          }
-
-          echo "BASTION_HOST=$(get_public_ip bastion)" >> $GITHUB_ENV
-          echo "CORE_IP=$(get_private_ip qa-core)" >> $GITHUB_ENV
-          echo "BUSINESS_IP=$(get_private_ip qa-business)" >> $GITHUB_ENV
-          echo "OPS_IP=$(get_private_ip qa-ops)" >> $GITHUB_ENV
-          echo "REALTIME_IP=$(get_private_ip qa-realtime)" >> $GITHUB_ENV
-          echo "MIDDLEWARE_IP=$(get_private_ip qa-middleware)" >> $GITHUB_ENV
-
-          echo "Discovered BASTION_HOST=$BASTION_HOST"
-          echo "Discovered CORE_IP=$CORE_IP"
-          echo "Discovered BUSINESS_IP=$BUSINESS_IP"
-          echo "Discovered OPS_IP=$OPS_IP"
-          echo "Discovered REALTIME_IP=$REALTIME_IP"
-          echo "Discovered MIDDLEWARE_IP=$MIDDLEWARE_IP"
-
-      - name: Install SSH key
-        run: |
           mkdir -p ~/.ssh
-          cat > ~/.ssh/id_rsa << 'EOF'
-          ${{ secrets.QA_SSH_PRIVATE_KEY }}
-          EOF
+          printf '%s' "${{ secrets.QA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           sed -i 's/\r$//' ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
 
-          ssh-keyscan -H ${{ env.BASTION_HOST }} >> ~/.ssh/known_hosts || true
+          # Trust bastion
+          ssh-keyscan -H "${BASTION_HOST}" >> ~/.ssh/known_hosts
 
       - name: Deploy to QA hosts through Bastion
         env:
           BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
+
           GHCR_USER: ${{ secrets.QA_GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.QA_GHCR_TOKEN }}
 
-          DB_HOSTPORT: "campusuce-trade-qa-postgres.cfy8cv49icv0.us-east-1.rds.amazonaws.com:5432"
-          DB_NAME: "campusuce"
-          DB_USER: "campusuce"
-          DB_PASSWORD: ${{ secrets.QA_DB_PASSWORD }}
+          QA_DB_HOST: ${{ secrets.QA_DB_HOST }}
+          QA_DB_NAME: ${{ secrets.QA_DB_NAME }}
+          QA_DB_USER: ${{ secrets.QA_DB_USER }}
+          QA_DB_PASSWORD: ${{ secrets.QA_DB_PASSWORD }}
 
-          JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
-          JWT_ALGORITHM: "HS256"
+          QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
 
+          # IMPORTANT: update these IPs when terraform recreates
           CORE_IP: "10.0.4.233"
           BUSINESS_IP: "10.0.4.206"
           OPS_IP: "10.0.4.125"
@@ -91,42 +51,109 @@ jobs:
         run: |
           set -e
 
+          ssh_exec () {
+            HOST_IP="$1"
+            shift
+            ssh -i ~/.ssh/id_rsa \
+              -o StrictHostKeyChecking=no \
+              -o ProxyJump=ubuntu@${BASTION_HOST} \
+              ubuntu@${HOST_IP} "$@"
+          }
+
+          rsync_copy () {
+            SRC_DIR="$1"
+            HOST_IP="$2"
+            DEST_DIR="$3"
+            rsync -avz \
+              -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST}" \
+              "${SRC_DIR}/" "ubuntu@${HOST_IP}:${DEST_DIR}/"
+          }
+
+          docker_login () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "set -e
+              echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+            "
+          }
+
+          make_env_core () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/core/.env <<'EOF'
+            DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
+            REDIS_URL=redis://${MIDDLEWARE_IP}:6379/0
+            JWT_SECRET=${QA_JWT_SECRET}
+            JWT_ALGORITHM=HS256
+            EOF"
+          }
+
+          make_env_business () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/business/.env <<'EOF'
+            DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
+            JWT_SECRET=${QA_JWT_SECRET}
+            JWT_ALGORITHM=HS256
+            S3_BUCKET=${QA_DB_NAME}-media
+            S3_REGION=us-east-1
+            EOF"
+          }
+
+          make_env_ops () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/ops/.env <<'EOF'
+            DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
+            JWT_SECRET=${QA_JWT_SECRET}
+            JWT_ALGORITHM=HS256
+            RABBITMQ_URL=amqp://guest:guest@${MIDDLEWARE_IP}:5672/
+            KAFKA_BOOTSTRAP_SERVERS=${MIDDLEWARE_IP}:9092
+            MQTT_HOST=${MIDDLEWARE_IP}
+            MQTT_PORT=1883
+            EOF"
+          }
+
+          make_env_realtime () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/realtime/.env <<'EOF'
+            DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
+            JWT_SECRET=${QA_JWT_SECRET}
+            JWT_ALGORITHM=HS256
+            EOF"
+          }
+
+          make_env_middleware () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/middleware/.env <<'EOF'
+            # Middleware usually has no DB
+            EOF"
+          }
+
           deploy_block () {
             NAME="$1"
             HOST_IP="$2"
             SRC_DIR="$3"
-            REDIS_URL="$4"
+            ENV_FN="$4"
 
-            echo "== Deploying $NAME to $HOST_IP =="
+            echo "== Deploying ${NAME} to ${HOST_IP} =="
 
-            rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST}" \
-              "${SRC_DIR}/" "ubuntu@${HOST_IP}:/home/ubuntu/deploy/${NAME}/"
+            ssh_exec "${HOST_IP}" "mkdir -p /home/ubuntu/deploy/${NAME}"
+            rsync_copy "${SRC_DIR}" "${HOST_IP}" "/home/ubuntu/deploy/${NAME}"
 
-            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST} ubuntu@${HOST_IP} "
-              set -e
+            ${ENV_FN} "${HOST_IP}"
+
+            docker_login "${HOST_IP}"
+
+            ssh_exec "${HOST_IP}" "set -e
               cd /home/ubuntu/deploy/${NAME}
+              docker compose --env-file .env pull || true
+              docker compose --env-file .env up -d
+              docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 30
+            "
+          }
 
-              cat > .env <<EOF
-            DATABASE_URL=postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@${DB_HOSTPORT}/${DB_NAME}
-            REDIS_URL=${REDIS_URL}
-            JWT_SECRET=${JWT_SECRET}
-            JWT_ALGORITHM=${JWT_ALGORITHM}
-            EOF
+          # 1) Middleware first
+          deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware" "make_env_middleware"
 
-                        echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
-                        docker compose --env-file .env pull
-                        docker compose --env-file .env up -d
-                        docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
-                        "
-                    }
-
-                    # Middleware first (no depende de Redis remoto)
-                    deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware" "redis://127.0.0.1:6379/0"
-
-                    # Redis vive en middleware host
-                    REDIS_ON_MW="redis://${MIDDLEWARE_IP}:6379/0"
-
-                    deploy_block "core" "${CORE_IP}" "deploy/qa/core" "${REDIS_ON_MW}"
-                    deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business" "${REDIS_ON_MW}"
-                    deploy_block "ops" "${OPS_IP}" "deploy/qa/ops" "${REDIS_ON_MW}"
-                    deploy_block "realtime" "${REALTIME_IP}" "deploy/qa/realtime" "${REDIS_ON_MW}"
+          # 2) Then app blocks
+          deploy_block "core" "${CORE_IP}" "deploy/qa/core" "make_env_core"
+          deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business" "make_env_business"
+          deploy_block "ops" "${OPS_IP}" "deploy/qa/ops" "make_env_ops"
+          deploy_block "realtime" "${REALTIME_IP}" "deploy/qa/realtime" "make_env_realtime"
