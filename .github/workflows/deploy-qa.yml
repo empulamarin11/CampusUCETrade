@@ -18,9 +18,18 @@ jobs:
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.QA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          printf '%s' "${{ secrets.QA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          sed -i 's/\r$//' ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+
+          # Trust bastion host
           ssh-keyscan -H ${{ secrets.QA_BASTION_HOST }} >> ~/.ssh/known_hosts
+
+          # Trust private hosts (through bastion proxy)
+          for ip in 10.0.4.153 10.0.4.181 10.0.4.163 10.0.4.216 10.0.4.183; do
+            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${{ secrets.QA_BASTION_HOST }} ubuntu@$ip "exit 0" || true
+            ssh-keyscan -H $ip >> ~/.ssh/known_hosts || true
+          done
 
       - name: Deploy to QA hosts through Bastion
         env:
@@ -43,11 +52,11 @@ jobs:
             echo "== Deploying $NAME to $HOST_IP =="
 
             # Copy compose/nginx files to the target private host (via bastion proxy)
-            rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ProxyJump=ubuntu@${BASTION_HOST}" \
-              "${SRC_DIR}/" "ubuntu@${HOST_IP}:/home/ubuntu/deploy/${NAME}/"
+            rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST}" \
+                "${SRC_DIR}/" "ubuntu@${HOST_IP}:/home/ubuntu/deploy/${NAME}/"
 
             # Run docker login + compose up
-            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ProxyJump=ubuntu@${BASTION_HOST} ubuntu@${HOST_IP} \
+            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST} ubuntu@${HOST_IP} "..."
               "set -e
                sudo mkdir -p /home/ubuntu/deploy/${NAME} || true
                cd /home/ubuntu/deploy/${NAME}

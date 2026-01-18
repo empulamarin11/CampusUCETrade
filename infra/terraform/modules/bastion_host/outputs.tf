@@ -14,3 +14,8 @@ output "security_group_id" {
   description = "The ID of the Security Group attached to the Bastion"
   value       = aws_security_group.bastion_sg.id
 }
+
+output "eip_public_ip" {
+  description = "Elastic IP for Bastion (stable public IP)"
+  value       = aws_eip.bastion_eip.public_ip
+}
