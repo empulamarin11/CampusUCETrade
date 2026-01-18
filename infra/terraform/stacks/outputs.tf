@@ -19,7 +19,7 @@ output "private_subnet_ids" {
 # ==============================================================================
 
 output "bastion_public_ip" {
-  value = module.bastion.public_ip
+  value = module.bastion.eip_public_ip
 }
 
 output "bastion_security_group_id" {

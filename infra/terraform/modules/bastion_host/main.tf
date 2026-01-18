@@ -66,3 +66,15 @@ resource "aws_instance" "bastion" {
     Role = "bastion"
   })
 }
+
+# ------------------------------------------------------------------------------
+# 4. ELASTIC IP (Fixed public IP for Bastion)
+# ------------------------------------------------------------------------------
+resource "aws_eip" "bastion_eip" {
+  domain   = "vpc"
+  instance = aws_instance.bastion.id
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-bastion-eip"
+  })
+}

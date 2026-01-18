@@ -449,7 +449,7 @@ resource "aws_lb_listener_rule" "rule_ops" {
 
   condition {
     path_pattern {
-      values = ["/delivery*", "/reputation*", "/traceability*"]
+      values = ["/notifications*", "/reputation*", "/traceability*"]
     }
   }
 }
@@ -466,7 +466,7 @@ resource "aws_lb_listener_rule" "rule_realtime" {
 
   condition {
     path_pattern {
-      values = ["/chat*"]
+      values = ["/chat*", "/delivery*"]
     }
   }
 }
