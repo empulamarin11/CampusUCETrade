@@ -41,6 +41,54 @@ services:
       - n8n_data:/home/node/.n8n
     restart: unless-stopped
 
+  minio:
+    image: minio/minio:latest
+    container_name: campus-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: campus-mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: campus-zookeeper
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: campus-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+
   user-service:
     build:
       context: ./services/user-service
@@ -76,6 +124,13 @@ services:
       - JWT_SECRET=dev_jwt_secret_key
       - JWT_ALGORITHM=HS256
       - SERVICE_ROOT_PATH=/items
+      - S3_PUBLIC_ENDPOINT=http://localhost:9000
+      - S3_ENDPOINT=http://minio:9000
+      
+      - S3_BUCKET=campus-media
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin123
+      - S3_REGION=us-east-1
     depends_on:
       - postgres
     ports:
@@ -118,8 +173,92 @@ services:
       - rabbitmq
     ports:
       - "8005:8000"
+  chat-service:
+    build:
+      context: ./services/chat-service
+    container_name: campus-chat-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/chat
+    depends_on:
+      - postgres
+    ports:
+      - "8006:8000"
 
+  search-service:
+    build:
+      context: ./services/search-service
+    container_name: campus-search-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/search
+      - S3_ENDPOINT=http://minio:9000
+      - S3_PUBLIC_BASE_URL=http://localhost:9000
+      - S3_BUCKET=campus-media
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin123
+      - AWS_REGION=us-east-1
+    depends_on:
+      - postgres
+      - minio
+    ports:
+      - "8008:8000"
+
+  delivery-service:
+    build:
+      context: ./services/delivery-service
+    container_name: campus-delivery-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/delivery
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - MQTT_HOST=mqtt
+      - MQTT_PORT=1883
+      - MQTT_CLIENT_ID=delivery-service
+      - TOPIC_CREATE=campus/delivery/create
+      - TOPIC_CONFIRM=campus/delivery/confirm
+      - TOPIC_DELIVERED=campus/delivery/delivered
+    depends_on:
+      - postgres
+      - mqtt
+    ports:
+      - "8007:8000"
+
+  reputation-service:
+    build:
+      context: ./services/reputation-service
+    container_name: campus-reputation-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/reputation
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
+    ports:
+      - "8009:8000"
+
+  traceability-service:
+    build:
+      context: ./services/traceability-service
+    container_name: campus-traceability-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - SERVICE_ROOT_PATH=/traceability
+      - JWT_SECRET=dev_jwt_secret_key
+      - JWT_ALGORITHM=HS256
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=campus.audit
+      - KAFKA_GROUP_ID=traceability-service
+      - ENABLE_AUDIT_SEED=true
+    depends_on:
+      - postgres
+      - kafka
+    ports:
+      - "8010:8000"
 
 volumes:
   campus_pgdata:
   n8n_data:
+  minio_data:
