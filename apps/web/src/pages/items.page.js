@@ -1,8 +1,12 @@
 import { listItems, createItem } from "../api/items.api.js";
+import { createReservation } from "../api/reservations.api.js";
 
-export function renderItems(container, goToLogin, goToSearch) {
+export function renderItems(container, goToLogin, goToSearch, goToReservations, goToNotifications, goToChat, goToDelivery, goToReputation, goToTraceability) {
   const token = localStorage.getItem("token");
-  if (!token) { goToLogin(); return; }
+  if (!token) {
+    goToLogin();
+    return;
+  }
 
   container.innerHTML = `
     <div class="topbar">
@@ -12,9 +16,16 @@ export function renderItems(container, goToLogin, goToSearch) {
       </div>
       <div class="topActions">
         <button class="btn" id="searchBtn" type="button">Search</button>
+        <button class="btn" id="reservationsBtn" type="button">Reservations</button>
+        <button class="btn" id="deliveryBtn">Delivery</button>
         <button class="btn primary" id="openCreateBtn" type="button">Create item</button>
+        <button class="btn" id="chatBtn">Chat</button>
+        <button class="btn" id="notificationsBtn" type="button">Notifications</button>
+        <button class="btn" id="reputationBtn" type="button">Reputation</button>
+        <button class="btn" id="traceBtn" type="button">Traceability</button>
         <button class="btn" id="logoutBtn" type="button">Sign out</button>
-      </div>
+        
+        </div>
     </div>
 
     <div id="msg" class="msg" aria-live="polite"></div>
@@ -27,7 +38,7 @@ export function renderItems(container, goToLogin, goToSearch) {
       <div id="list" class="small" style="margin-top:12px">Loading...</div>
     </div>
 
-    <!-- Modal -->
+    <!-- Create modal -->
     <div class="modal" id="createModal" aria-hidden="true">
       <div class="modalBackdrop" id="closeModalBackdrop"></div>
       <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="createTitle">
@@ -98,10 +109,7 @@ export function renderItems(container, goToLogin, goToSearch) {
     modal.classList.remove("open");
   }
 
-  container.querySelector("#openCreateBtn").onclick = openModal;
-  container.querySelector("#closeModalBtn").onclick = closeModal;
-  container.querySelector("#closeModalBackdrop").onclick = closeModal;
-
+  // Topbar actions
   container.querySelector("#logoutBtn").onclick = () => {
     localStorage.removeItem("token");
     goToLogin();
@@ -110,6 +118,35 @@ export function renderItems(container, goToLogin, goToSearch) {
   container.querySelector("#searchBtn").onclick = () => {
     if (goToSearch) goToSearch();
   };
+
+  container.querySelector("#reservationsBtn").onclick = () => {
+    if (goToReservations) goToReservations();
+  };
+
+  container.querySelector("#notificationsBtn").onclick = () => {
+    if (goToNotifications) goToNotifications();
+  };
+
+  container.querySelector("#chatBtn").onclick = () => {
+    if (goToChat) goToChat();
+  };
+
+  container.querySelector("#deliveryBtn").onclick = () => {
+    if (goToDelivery) goToDelivery();
+  };
+
+  container.querySelector("#reputationBtn").onclick = () => {
+    if (goToReputation) goToReputation();
+  };
+
+  container.querySelector("#traceBtn").onclick = () => goToTraceability && goToTraceability();
+
+
+
+  // Modal actions
+  container.querySelector("#openCreateBtn").onclick = openModal;
+  container.querySelector("#closeModalBtn").onclick = closeModal;
+  container.querySelector("#closeModalBackdrop").onclick = closeModal;
 
   async function refresh() {
     msg.className = "msg";
@@ -135,11 +172,35 @@ export function renderItems(container, goToLogin, goToSearch) {
               <div class="small" style="margin-top:6px">
                 Price: <b>${escapeHtml(String(i.price ?? ""))} ${escapeHtml(i.currency ?? "")}</b>
               </div>
+
+              <div class="row" style="margin-top:10px">
+                <button class="btn" type="button" data-reserve="${escapeHtml(i.id ?? "")}">Reserve</button>
+              </div>
+
               <div class="small" style="opacity:.8; margin-top:6px">ID: ${escapeHtml(i.id ?? "")}</div>
             </div>
           `).join("")}
         </div>
       `;
+
+      // Reserve buttons
+      list.querySelectorAll("[data-reserve]").forEach((btn) => {
+        btn.onclick = async () => {
+          const itemId = btn.getAttribute("data-reserve");
+          msg.className = "msg";
+          msg.textContent = "Creating reservation...";
+
+          try {
+            // Most common payload: { item_id: "..." }
+            const notes = prompt("Notes (optional):", "Reserved from UI") || "";
+            await createReservation(token, { item_id: itemId, notes });
+            setMsg("Reservation created ✅", true);
+            if (goToReservations) goToReservations();
+          } catch (e) {
+            setMsg(`Reservation failed: ${e.message}`, false);
+          }
+        };
+      });
     } catch (e) {
       setMsg(`Load failed: ${e.message}`, false);
       list.textContent = "Failed to load items.";
@@ -148,6 +209,7 @@ export function renderItems(container, goToLogin, goToSearch) {
 
   container.querySelector("#refreshBtn").onclick = refresh;
 
+  // Create item (modal)
   container.querySelector("#createForm").onsubmit = async (ev) => {
     ev.preventDefault();
     setModalMsg("Creating item...", true);

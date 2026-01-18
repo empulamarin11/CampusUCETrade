@@ -8,7 +8,7 @@ export default defineConfig({
       "/items": "http://localhost:8003",
       "/reservations": "http://localhost:8004",
       "/notifications": "http://localhost:8005",
-      "/chat": "http://localhost:8006",
+      "/chat": { target: "http://localhost:8006", changeOrigin: true, ws: true },
       "/delivery": "http://localhost:8007",
       "/search": "http://localhost:8008",
       "/reputation": "http://localhost:8009",

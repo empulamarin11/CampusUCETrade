@@ -18,7 +18,12 @@ ENABLE_AUDIT_SEED = os.getenv("ENABLE_AUDIT_SEED", "false").lower() == "true"
 
 def _current_email(creds: HTTPAuthorizationCredentials = Depends(security)) -> str:
     try:
-        payload = jwt.decode(creds.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            creds.credentials,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_aud": False},
+        )
         sub = payload.get("sub")
         if not sub:
             raise ValueError("missing_sub")

@@ -117,3 +117,44 @@ input{
   padding:16px;
 }
 .modalHeader{display:flex; justify-content:space-between; align-items:flex-start; gap:12px}
+.chatBox{
+  margin-top:12px;
+  border:1px solid var(--stroke);
+  border-radius:12px;
+  padding:12px;
+  background:rgba(0,0,0,.14);
+  min-height:260px;
+  display:grid;
+  gap:10px;
+}
+
+.bubble{
+  border:1px solid var(--stroke);
+  border-radius:12px;
+  padding:10px;
+  background:rgba(0,0,0,.18);
+}
+
+.bubbleTop{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:6px;
+  font-size:12px;
+  opacity:.9;
+}
+
+.bubbleWho{font-weight:800}
+.bubbleAt{opacity:.75}
+.bubbleText{white-space:pre-wrap}
+
+
+.codeBox{
+  margin-top:12px;
+  border:1px solid var(--stroke);
+  border-radius:12px;
+  padding:12px;
+  background:rgba(0,0,0,.16);
+  overflow:auto;
+  min-height:120px;
+}
