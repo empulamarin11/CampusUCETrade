@@ -15,6 +15,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials (Academy)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Discover QA instance IPs by tags
+        run: |
+          set -e
+
+          get_private_ip () {
+            ROLE="$1"
+            aws ec2 describe-instances \
+              --filters "Name=tag:Role,Values=${ROLE}" "Name=instance-state-name,Values=running" \
+              --query "Reservations[0].Instances[0].PrivateIpAddress" \
+              --output text
+          }
+
+          get_public_ip () {
+            ROLE="$1"
+            aws ec2 describe-instances \
+              --filters "Name=tag:Role,Values=${ROLE}" "Name=instance-state-name,Values=running" \
+              --query "Reservations[0].Instances[0].PublicIpAddress" \
+              --output text
+          }
+
+          echo "BASTION_HOST=$(get_public_ip bastion)" >> $GITHUB_ENV
+          echo "CORE_IP=$(get_private_ip qa-core)" >> $GITHUB_ENV
+          echo "BUSINESS_IP=$(get_private_ip qa-business)" >> $GITHUB_ENV
+          echo "OPS_IP=$(get_private_ip qa-ops)" >> $GITHUB_ENV
+          echo "REALTIME_IP=$(get_private_ip qa-realtime)" >> $GITHUB_ENV
+          echo "MIDDLEWARE_IP=$(get_private_ip qa-middleware)" >> $GITHUB_ENV
+
+          echo "Discovered BASTION_HOST=$BASTION_HOST"
+          echo "Discovered CORE_IP=$CORE_IP"
+          echo "Discovered BUSINESS_IP=$BUSINESS_IP"
+          echo "Discovered OPS_IP=$OPS_IP"
+          echo "Discovered REALTIME_IP=$REALTIME_IP"
+          echo "Discovered MIDDLEWARE_IP=$MIDDLEWARE_IP"
+
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
@@ -25,19 +67,12 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
 
-          ssh-keyscan -H ${{ secrets.QA_BASTION_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.BASTION_HOST }} >> ~/.ssh/known_hosts || true
 
       - name: Deploy to QA hosts through Bastion
         env:
-          BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
           GHCR_USER: ${{ secrets.QA_GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.QA_GHCR_TOKEN }}
-
-          CORE_IP: "10.0.4.153"
-          BUSINESS_IP: "10.0.4.181"
-          OPS_IP: "10.0.4.163"
-          REALTIME_IP: "10.0.4.216"
-          MIDDLEWARE_IP: "10.0.4.183"
         run: |
           set -e
 
@@ -54,7 +89,6 @@ jobs:
             local host_ip="$1"
             local src_dir="$2"
             local dst_dir="$3"
-
             ssh_via_bastion "${host_ip}" "mkdir -p ${dst_dir}"
             tar -cz -C "${src_dir}" . | ssh -i ~/.ssh/id_rsa \
               -o StrictHostKeyChecking=no \
