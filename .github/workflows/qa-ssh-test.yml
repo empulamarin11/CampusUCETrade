@@ -1,4 +1,4 @@
-name: QA SSH Test (Bastion)
+name: QA SSH Test (Bastion.)
 
 on:
   workflow_dispatch:
