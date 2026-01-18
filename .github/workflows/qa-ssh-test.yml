@@ -1,12 +1,20 @@
-name: QA SSH Test (Bastion.)
+name: QA SSH Test (Bastion)
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ssh-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Install SSH key
         run: |
           set -e
@@ -19,4 +27,4 @@ jobs:
       - name: SSH to Bastion (simple command)
         run: |
           set -e
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes ubuntu@${{ secrets.QA_BASTION_HOST }} "whoami && hostname && date"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes ubuntu@${{ secrets.QA_BASTION_HOST }} "whoami && hostname && uptime"
