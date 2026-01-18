@@ -71,54 +71,62 @@ jobs:
 
       - name: Deploy to QA hosts through Bastion
         env:
+          BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
           GHCR_USER: ${{ secrets.QA_GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.QA_GHCR_TOKEN }}
+
+          DB_HOSTPORT: "campusuce-trade-qa-postgres.cfy8cv49icv0.us-east-1.rds.amazonaws.com:5432"
+          DB_NAME: "campusuce"
+          DB_USER: "campusuce"
+          DB_PASSWORD: ${{ secrets.QA_DB_PASSWORD }}
+
+          JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
+          JWT_ALGORITHM: "HS256"
+
+          CORE_IP: "10.0.4.233"
+          BUSINESS_IP: "10.0.4.206"
+          OPS_IP: "10.0.4.125"
+          REALTIME_IP: "10.0.4.181"
+          MIDDLEWARE_IP: "10.0.4.222"
         run: |
           set -e
 
-          ssh_via_bastion () {
-            local host_ip="$1"
-            shift
-            ssh -i ~/.ssh/id_rsa \
-              -o StrictHostKeyChecking=no \
-              -o ProxyJump=ubuntu@${BASTION_HOST} \
-              ubuntu@${host_ip} "$@"
-          }
-
-          copy_dir_tar () {
-            local host_ip="$1"
-            local src_dir="$2"
-            local dst_dir="$3"
-            ssh_via_bastion "${host_ip}" "mkdir -p ${dst_dir}"
-            tar -cz -C "${src_dir}" . | ssh -i ~/.ssh/id_rsa \
-              -o StrictHostKeyChecking=no \
-              -o ProxyJump=ubuntu@${BASTION_HOST} \
-              ubuntu@${host_ip} "tar -xz -C ${dst_dir}"
-          }
-
           deploy_block () {
-            local name="$1"
-            local host_ip="$2"
-            local src_dir="$3"
-            local dst_dir="/home/ubuntu/deploy/${name}"
+            NAME="$1"
+            HOST_IP="$2"
+            SRC_DIR="$3"
+            REDIS_URL="$4"
 
-            echo "== Deploying ${name} to ${host_ip} =="
+            echo "== Deploying $NAME to $HOST_IP =="
 
-            copy_dir_tar "${host_ip}" "${src_dir}" "${dst_dir}"
+            rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST}" \
+              "${SRC_DIR}/" "ubuntu@${HOST_IP}:/home/ubuntu/deploy/${NAME}/"
 
-            ssh_via_bastion "${host_ip}" "
+            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST} ubuntu@${HOST_IP} "
               set -e
-              cd ${dst_dir}
-              echo '${GHCR_TOKEN}' | sudo docker login ghcr.io -u '${GHCR_USER}' --password-stdin
-              sudo docker compose pull
-              sudo docker compose up -d --force-recreate
-              sudo docker image prune -f
-              sudo docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 25
-            "
-          }
+              cd /home/ubuntu/deploy/${NAME}
 
-          deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware"
-          deploy_block "core" "${CORE_IP}" "deploy/qa/core"
-          deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business"
-          deploy_block "ops" "${OPS_IP}" "deploy/qa/ops"
-          deploy_block "realtime" "${REALTIME_IP}" "deploy/qa/realtime"
+              cat > .env <<EOF
+            DATABASE_URL=postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@${DB_HOSTPORT}/${DB_NAME}
+            REDIS_URL=${REDIS_URL}
+            JWT_SECRET=${JWT_SECRET}
+            JWT_ALGORITHM=${JWT_ALGORITHM}
+            EOF
+
+                        echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+                        docker compose --env-file .env pull
+                        docker compose --env-file .env up -d
+                        docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
+                        "
+                    }
+
+                    # Middleware first (no depende de Redis remoto)
+                    deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware" "redis://127.0.0.1:6379/0"
+
+                    # Redis vive en middleware host
+                    REDIS_ON_MW="redis://${MIDDLEWARE_IP}:6379/0"
+
+                    deploy_block "core" "${CORE_IP}" "deploy/qa/core" "${REDIS_ON_MW}"
+                    deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business" "${REDIS_ON_MW}"
+                    deploy_block "ops" "${OPS_IP}" "deploy/qa/ops" "${REDIS_ON_MW}"
+                    deploy_block "realtime" "${REALTIME_IP}" "deploy/qa/realtime" "${REDIS_ON_MW}"
