@@ -18,24 +18,21 @@ jobs:
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s' "${{ secrets.QA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          cat > ~/.ssh/id_rsa << 'EOF'
+          ${{ secrets.QA_SSH_PRIVATE_KEY }}
+          EOF
           sed -i 's/\r$//' ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
 
-          # Trust bastion host
           ssh-keyscan -H ${{ secrets.QA_BASTION_HOST }} >> ~/.ssh/known_hosts
-
-          # Trust private hosts (through bastion proxy)
-          for ip in 10.0.4.153 10.0.4.181 10.0.4.163 10.0.4.216 10.0.4.183; do
-            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${{ secrets.QA_BASTION_HOST }} ubuntu@$ip "exit 0" || true
-            ssh-keyscan -H $ip >> ~/.ssh/known_hosts || true
-          done
 
       - name: Deploy to QA hosts through Bastion
         env:
           BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
           GHCR_USER: ${{ secrets.QA_GHCR_USER }}
           GHCR_TOKEN: ${{ secrets.QA_GHCR_TOKEN }}
+
           CORE_IP: "10.0.4.153"
           BUSINESS_IP: "10.0.4.181"
           OPS_IP: "10.0.4.163"
@@ -44,33 +41,49 @@ jobs:
         run: |
           set -e
 
-          deploy_block () {
-            NAME="$1"
-            HOST_IP="$2"
-            SRC_DIR="$3"
-
-            echo "== Deploying $NAME to $HOST_IP =="
-
-            # Copy compose/nginx files to the target private host (via bastion proxy)
-            rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST}" \
-                "${SRC_DIR}/" "ubuntu@${HOST_IP}:/home/ubuntu/deploy/${NAME}/"
-
-            # Run docker login + compose up
-            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=ubuntu@${BASTION_HOST} ubuntu@${HOST_IP} "..."
-              "set -e
-               sudo mkdir -p /home/ubuntu/deploy/${NAME} || true
-               cd /home/ubuntu/deploy/${NAME}
-               echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
-               docker compose pull
-               docker compose up -d
-               docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
-              "
+          ssh_via_bastion () {
+            local host_ip="$1"
+            shift
+            ssh -i ~/.ssh/id_rsa \
+              -o StrictHostKeyChecking=no \
+              -o ProxyJump=ubuntu@${BASTION_HOST} \
+              ubuntu@${host_ip} "$@"
           }
 
-          # Middleware first
-          deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware"
+          copy_dir_tar () {
+            local host_ip="$1"
+            local src_dir="$2"
+            local dst_dir="$3"
 
-          # Then app blocks
+            ssh_via_bastion "${host_ip}" "mkdir -p ${dst_dir}"
+            tar -cz -C "${src_dir}" . | ssh -i ~/.ssh/id_rsa \
+              -o StrictHostKeyChecking=no \
+              -o ProxyJump=ubuntu@${BASTION_HOST} \
+              ubuntu@${host_ip} "tar -xz -C ${dst_dir}"
+          }
+
+          deploy_block () {
+            local name="$1"
+            local host_ip="$2"
+            local src_dir="$3"
+            local dst_dir="/home/ubuntu/deploy/${name}"
+
+            echo "== Deploying ${name} to ${host_ip} =="
+
+            copy_dir_tar "${host_ip}" "${src_dir}" "${dst_dir}"
+
+            ssh_via_bastion "${host_ip}" "
+              set -e
+              cd ${dst_dir}
+              echo '${GHCR_TOKEN}' | sudo docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+              sudo docker compose pull
+              sudo docker compose up -d --force-recreate
+              sudo docker image prune -f
+              sudo docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 25
+            "
+          }
+
+          deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware"
           deploy_block "core" "${CORE_IP}" "deploy/qa/core"
           deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business"
           deploy_block "ops" "${OPS_IP}" "deploy/qa/ops"
