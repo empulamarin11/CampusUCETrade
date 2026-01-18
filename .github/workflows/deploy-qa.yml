@@ -1,0 +1,68 @@
+name: Deploy QA (EC2 via Bastion)
+
+on:
+  push:
+    branches: ["qa"]
+    paths:
+      - "deploy/qa/**"
+      - ".github/workflows/deploy-qa.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.QA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.QA_BASTION_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to QA hosts through Bastion
+        env:
+          BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
+          GHCR_USER: ${{ secrets.QA_GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.QA_GHCR_TOKEN }}
+          CORE_IP: "10.0.4.153"
+          BUSINESS_IP: "10.0.4.181"
+          OPS_IP: "10.0.4.163"
+          REALTIME_IP: "10.0.4.216"
+          MIDDLEWARE_IP: "10.0.4.183"
+        run: |
+          set -e
+
+          deploy_block () {
+            NAME="$1"
+            HOST_IP="$2"
+            SRC_DIR="$3"
+
+            echo "== Deploying $NAME to $HOST_IP =="
+
+            # Copy compose/nginx files to the target private host (via bastion proxy)
+            rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ProxyJump=ubuntu@${BASTION_HOST}" \
+              "${SRC_DIR}/" "ubuntu@${HOST_IP}:/home/ubuntu/deploy/${NAME}/"
+
+            # Run docker login + compose up
+            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes -o ProxyJump=ubuntu@${BASTION_HOST} ubuntu@${HOST_IP} \
+              "set -e
+               sudo mkdir -p /home/ubuntu/deploy/${NAME} || true
+               cd /home/ubuntu/deploy/${NAME}
+               echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+               docker compose pull
+               docker compose up -d
+               docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
+              "
+          }
+
+          # Middleware first
+          deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware"
+
+          # Then app blocks
+          deploy_block "core" "${CORE_IP}" "deploy/qa/core"
+          deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business"
+          deploy_block "ops" "${OPS_IP}" "deploy/qa/ops"
+          deploy_block "realtime" "${REALTIME_IP}" "deploy/qa/realtime"
