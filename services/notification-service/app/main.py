@@ -20,7 +20,9 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    Base.metadata.create_all(bind=engine)
+    if os.getenv("TESTING") != "1":
+        Base.metadata.create_all(bind=engine)
+
 
     @app.on_event("startup")
     def _startup() -> None:
