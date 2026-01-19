@@ -44,11 +44,11 @@ jobs:
           QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
 
           # IMPORTANT: update these IPs when terraform recreates
-          CORE_IP: "10.0.4.218"
-          BUSINESS_IP: "10.0.4.155"
-          OPS_IP: "10.0.4.232"
-          REALTIME_IP: "10.0.4.143"
-          MIDDLEWARE_IP: "10.0.4.151"
+          CORE_IP: "10.0.4.206"
+          BUSINESS_IP: "10.0.4.248"
+          OPS_IP: "10.0.4.122"
+          REALTIME_IP: "10.0.4.236"
+          MIDDLEWARE_IP: "10.0.4.218"
         run: |
           set -euo pipefail
 

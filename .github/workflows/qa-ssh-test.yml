@@ -19,4 +19,4 @@ jobs:
       - name: SSH to Bastion (simple command)
         run: |
           set -e
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes ubuntu@${{ secrets.QA_BASTION_HOST }} "whoami && hostname && date"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes ubuntu@${{ secrets.QA_BASTION_HOST }} "whoami && hostname && uptime"
