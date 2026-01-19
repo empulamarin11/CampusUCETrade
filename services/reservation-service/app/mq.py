@@ -1,7 +1,7 @@
 import json
 import os
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import pika
 

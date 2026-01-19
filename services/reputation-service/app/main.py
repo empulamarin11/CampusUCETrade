@@ -1,4 +1,5 @@
 # app/main.py
+import os
 from fastapi import FastAPI
 
 from app.config import settings
@@ -17,7 +18,8 @@ app = FastAPI(
 
 @app.on_event("startup")
 def startup():
-    Base.metadata.create_all(bind=engine)
+    if os.getenv("TESTING") != "1":
+        Base.metadata.create_all(bind=engine)
 
 
 app.include_router(router)

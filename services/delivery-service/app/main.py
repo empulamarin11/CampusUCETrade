@@ -1,4 +1,5 @@
 # app/main.py
+import os
 import logging
 import threading
 from fastapi import FastAPI
@@ -25,7 +26,8 @@ _mqtt_client = None
 @app.on_event("startup")
 def startup():
     # MVP: create tables on startup
-    Base.metadata.create_all(bind=engine)
+    if os.getenv("TESTING") != "1":
+        Base.metadata.create_all(bind=engine)
 
     # MQTT client loop in background
     global _mqtt_client
