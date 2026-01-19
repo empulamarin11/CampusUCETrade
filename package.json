@@ -14,10 +14,8 @@
     "format": "turbo run format",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down -v",
-
     "dev:core": "turbo run dev --parallel --filter=@campus/auth-service --filter=@campus/user-service --filter=@campus/item-service --filter=@campus/search-service --filter=@campus/reservation-service",
     "dev:all": "turbo run dev --parallel",
-
     "dev:auth": "turbo run dev --parallel --filter=@campus/auth-service",
     "dev:user": "turbo run dev --parallel --filter=@campus/user-service",
     "dev:item": "turbo run dev --parallel --filter=@campus/item-service",
@@ -28,13 +26,12 @@
     "dev:notification": "turbo run dev --parallel --filter=@campus/notification-service",
     "dev:reputation": "turbo run dev --parallel --filter=@campus/reputation-service",
     "dev:traceability": "turbo run dev --parallel --filter=@campus/traceability-service"
-
-    
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "turbo": "^2.7.2"
   },
   "private": true,

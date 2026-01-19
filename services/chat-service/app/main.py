@@ -24,7 +24,8 @@ def create_app() -> FastAPI:
     # Create tables on startup (MVP). Later: migrations (Alembic).
     @app.on_event("startup")
     async def startup():
-        Base.metadata.create_all(bind=engine)
+        if os.getenv("TESTING") != "1":
+            Base.metadata.create_all(bind=engine)
 
     app.include_router(router)
     return app
