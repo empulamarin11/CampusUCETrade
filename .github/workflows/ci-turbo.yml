@@ -1,9 +1,12 @@
-name: CI (Turbo: lint + unit tests)
+name: "CI (Turbo: lint + unit tests)"
 
 on:
   pull_request:
   push:
-    branches: ["qa", "dev", "main"]
+    branches:
+      - qa
+      - dev
+      - main
 
 jobs:
   ci:
