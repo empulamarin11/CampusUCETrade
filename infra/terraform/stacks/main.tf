@@ -30,8 +30,8 @@ module "bastion" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
-  ssh_key_name        = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  ssh_ingress_cidrs   = var.ssh_ingress_cidrs
+  ssh_key_name      = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
   tags = var.tags
 }

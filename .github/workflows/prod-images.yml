@@ -30,7 +30,7 @@ jobs:
           set -e
 
           OWNER="${{ secrets.PROD_GHCR_USER }}"
-          TAG="dev"   # cuando funcione, cambia a: "prod"
+          TAG="qa"   # cuando funcione, cambia a: "prod"
 
           services=(
             auth-service
