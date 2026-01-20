@@ -72,8 +72,11 @@ data "aws_ami" "ubuntu" {
 # Distribute instances across private subnets (Multi-AZ friendly)
 # ------------------------------------------------------------------------------
 locals {
-  subnet_index = length(var.private_subnet_ids) > 1 ? (parseint(substr(md5(var.role_name), 0, 2), 16) % length(var.private_subnet_ids)) : 0
+  subnet_index     = length(var.private_subnet_ids) > 1 ? (parseint(substr(md5(var.role_name), 0, 2), 16) % length(var.private_subnet_ids)) : 0
   chosen_subnet_id = element(var.private_subnet_ids, local.subnet_index)
+
+  # NEW: "prod-core" -> "core", "dev-core" -> "core"
+  role_short = replace(var.role_name, "${var.environment}-", "")
 }
 
 # ------------------------------------------------------------------------------
@@ -125,8 +128,10 @@ resource "aws_instance" "app_node" {
               EOF
 
   tags = merge(var.tags, {
-    Name = "${var.name}-${var.role_name}"
-    Role = var.role_name
-    Env  = var.environment
+    Name      = "${var.name}-${var.role_name}"
+    Project   = lookup(var.tags, "Project", "campusuce-trade") # NEW: makes workflow filtering stable
+    Role      = var.role_name
+    RoleShort = local.role_short    # NEW: lets workflow query "core" etc.
+    Env       = var.environment
   })
 }
