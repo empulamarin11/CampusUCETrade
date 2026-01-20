@@ -201,7 +201,7 @@ jobs:
 
           pick_core_ip () {
             for ip in $CORE_IPS; do
-              echo "Testing CORE candidate: $ip"
+              echo "Testing CORE candidate: $ip" >&2
               if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
                 -o ProxyJump=${SSH_USER}@${BASTION_HOST} ${SSH_USER}@${ip} "echo ok" >/dev/null 2>&1; then
                 echo "$ip"
@@ -212,7 +212,9 @@ jobs:
           }
 
           CORE_IP="$(pick_core_ip)"
+          echo "CORE_IP=$CORE_IP" >> $GITHUB_ENV
           echo "Selected CORE_IP=$CORE_IP"
+
 
           deploy_block () {
             NAME="$1"
