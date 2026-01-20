@@ -2,7 +2,7 @@ name: Deploy PROD (EC2/ASG via Bastion, Dynamic IPs)
 
 on:
   push:
-    branches: ["dev"]   # cuando ya funcione, cambia a: ["main"]
+    branches: ["dev"] # cuando ya funcione, cambia a: ["main"]
     paths:
       - "deploy/prod/**"
       - ".github/workflows/deploy-prod.yml"
@@ -67,9 +67,10 @@ jobs:
           BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
         run: |
           set -euo pipefail
+
           pick_core_ip () {
             for ip in $CORE_IPS; do
-              echo "Testing CORE candidate: $ip"
+              echo "Testing CORE candidate: $ip" >&2
               if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
                 -o ProxyJump=${SSH_USER}@${BASTION_HOST} ${SSH_USER}@${ip} "echo ok" >/dev/null 2>&1; then
                 echo "$ip"
@@ -78,6 +79,7 @@ jobs:
             done
             return 1
           }
+
           CORE_IP="$(pick_core_ip)"
           echo "CORE_IP=$CORE_IP" >> $GITHUB_ENV
           echo "Selected CORE_IP=$CORE_IP"
@@ -90,6 +92,7 @@ jobs:
           echo "OPS_IP=$OPS_IP"
           echo "REALTIME_IP=$REALTIME_IP"
           echo "MIDDLEWARE_IP=$MIDDLEWARE_IP"
+
           test -n "$CORE_IP" && test "$CORE_IP" != "None"
           test -n "$BUSINESS_IP" && test "$BUSINESS_IP" != "None"
           test -n "$OPS_IP" && test "$OPS_IP" != "None"
@@ -98,7 +101,7 @@ jobs:
 
       - name: Deploy to PROD hosts through Bastion
         env:
-          SSH_USER: "ubuntu"
+          SSH_USER: ubuntu
           BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
 
           GHCR_USER: ${{ secrets.PROD_GHCR_USER }}
@@ -198,23 +201,6 @@ jobs:
           # Middleware usually has no DB
           EOF"
           }
-
-          pick_core_ip () {
-            for ip in $CORE_IPS; do
-              echo "Testing CORE candidate: $ip" >&2
-              if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
-                -o ProxyJump=${SSH_USER}@${BASTION_HOST} ${SSH_USER}@${ip} "echo ok" >/dev/null 2>&1; then
-                echo "$ip"
-                return 0
-              fi
-            done
-            return 1
-          }
-
-          CORE_IP="$(pick_core_ip)"
-          echo "CORE_IP=$CORE_IP" >> $GITHUB_ENV
-          echo "Selected CORE_IP=$CORE_IP"
-
 
           deploy_block () {
             NAME="$1"
