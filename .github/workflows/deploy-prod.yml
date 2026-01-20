@@ -51,11 +51,11 @@ jobs:
                 "Name=tag:Env,Values=${ENV_TAG}" \
                 "Name=tag:RoleShort,Values=${ROLE_SHORT}" \
                 "Name=instance-state-name,Values=running" \
-              --query "Reservations[].Instances[].PrivateIpAddress | [0]" \
+              --query "Reservations[].Instances[].PrivateIpAddress" \
               --output text
           }
 
-          echo "CORE_IP=$(ip_for_role core)" >> $GITHUB_ENV
+          echo "CORE_IPS=$(ip_for_role core)" >> $GITHUB_ENV
           echo "BUSINESS_IP=$(ip_for_role business)" >> $GITHUB_ENV
           echo "OPS_IP=$(ip_for_role ops)" >> $GITHUB_ENV
           echo "REALTIME_IP=$(ip_for_role realtime)" >> $GITHUB_ENV
@@ -177,6 +177,21 @@ jobs:
           # Middleware usually has no DB
           EOF"
           }
+
+          pick_core_ip () {
+            for ip in $CORE_IPS; do
+              echo "Testing CORE candidate: $ip"
+              if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
+                -o ProxyJump=${SSH_USER}@${BASTION_HOST} ${SSH_USER}@${ip} "echo ok" >/dev/null 2>&1; then
+                echo "$ip"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          CORE_IP="$(pick_core_ip)"
+          echo "Selected CORE_IP=$CORE_IP"
 
           deploy_block () {
             NAME="$1"
