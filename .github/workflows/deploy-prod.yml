@@ -1,0 +1,113 @@
+name: Deploy PROD (Dynamic IPs via Bastion)
+
+on:
+  push:
+    branches: ["dev"]  # cuando ya funcione, cambia a: ["main"]
+    paths:
+      - "deploy/prod/**"
+      - ".github/workflows/deploy-prod.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_TAG: campusuce-trade
+      ENV_TAG: dev            # cuando ya funcione, cambia a: prod
+      AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key + known_hosts
+        env:
+          BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          sed -i 's/\r$//' ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$BASTION_HOST" >> ~/.ssh/known_hosts
+
+      - name: Configure AWS credentials (PROD)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.PROD_AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Discover private IPs (by tags)
+        run: |
+          set -euo pipefail
+
+          ip_for_role () {
+            local ROLE_SHORT="$1"
+            aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Project,Values=${PROJECT_TAG}" \
+                "Name=tag:Env,Values=${ENV_TAG}" \
+                "Name=tag:RoleShort,Values=${ROLE_SHORT}" \
+                "Name=instance-state-name,Values=running" \
+              --query "Reservations[].Instances[].PrivateIpAddress" \
+              --output text
+          }
+
+          echo "CORE_IP=$(ip_for_role core)" >> $GITHUB_ENV
+          echo "BUSINESS_IP=$(ip_for_role business)" >> $GITHUB_ENV
+          echo "OPS_IP=$(ip_for_role ops)" >> $GITHUB_ENV
+          echo "REALTIME_IP=$(ip_for_role realtime)" >> $GITHUB_ENV
+          echo "MIDDLEWARE_IP=$(ip_for_role middleware)" >> $GITHUB_ENV
+
+      - name: Sanity check IPs
+        run: |
+          set -euo pipefail
+          echo "CORE_IP=$CORE_IP"
+          echo "BUSINESS_IP=$BUSINESS_IP"
+          echo "OPS_IP=$OPS_IP"
+          echo "REALTIME_IP=$REALTIME_IP"
+          echo "MIDDLEWARE_IP=$MIDDLEWARE_IP"
+          test -n "$CORE_IP"
+          test "$CORE_IP" != "None"
+
+      - name: Deploy via Bastion (pull + up)
+        env:
+          BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
+          GHCR_USER: ${{ secrets.PROD_GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.PROD_GHCR_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          REMOTE_DIR="/opt/campus"
+
+          run_remote () {
+            local HOST="$1"
+            local CMD="$2"
+            ssh -o StrictHostKeyChecking=yes -J ubuntu@"$BASTION_HOST" ubuntu@"$HOST" "$CMD"
+          }
+
+          login_ghcr='echo "'"$GHCR_TOKEN"'" | docker login ghcr.io -u "'"$GHCR_USER"'" --password-stdin'
+
+          deploy_core="$login_ghcr && cd $REMOTE_DIR && docker compose -f docker-compose.core.yml pull && docker compose -f docker-compose.core.yml up -d"
+          deploy_business="$login_ghcr && cd $REMOTE_DIR && docker compose -f docker-compose.business.yml pull && docker compose -f docker-compose.business.yml up -d"
+          deploy_ops="$login_ghcr && cd $REMOTE_DIR && docker compose -f docker-compose.ops.yml pull && docker compose -f docker-compose.ops.yml up -d"
+          deploy_realtime="$login_ghcr && cd $REMOTE_DIR && docker compose -f docker-compose.realtime.yml pull && docker compose -f docker-compose.realtime.yml up -d"
+          deploy_middleware="$login_ghcr && cd $REMOTE_DIR && docker compose -f docker-compose.middleware.yml pull && docker compose -f docker-compose.middleware.yml up -d"
+
+          if [ -n "${CORE_IP:-}" ] && [ "$CORE_IP" != "None" ]; then
+            run_remote "$CORE_IP" "$deploy_core"
+          fi
+          if [ -n "${BUSINESS_IP:-}" ] && [ "$BUSINESS_IP" != "None" ]; then
+            run_remote "$BUSINESS_IP" "$deploy_business"
+          fi
+          if [ -n "${OPS_IP:-}" ] && [ "$OPS_IP" != "None" ]; then
+            run_remote "$OPS_IP" "$deploy_ops"
+          fi
+          if [ -n "${REALTIME_IP:-}" ] && [ "$REALTIME_IP" != "None" ]; then
+            run_remote "$REALTIME_IP" "$deploy_realtime"
+          fi
+          if [ -n "${MIDDLEWARE_IP:-}" ] && [ "$MIDDLEWARE_IP" != "None" ]; then
+            run_remote "$MIDDLEWARE_IP" "$deploy_middleware"
+          fi
