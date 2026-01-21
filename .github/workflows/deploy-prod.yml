@@ -2,7 +2,7 @@ name: Deploy PROD (EC2/ASG via Bastion, Dynamic IPs)
 
 on:
   push:
-    branches: ["main"] # cuando ya funcione, cambia a: ["main"]
+    branches: ["feat/pwa"] # cuando ya funcione, cambia a: ["main"] o ["prod"]
     paths:
       - "deploy/prod/**"
       - ".github/workflows/deploy-prod.yml"
@@ -88,12 +88,14 @@ jobs:
         run: |
           set -euo pipefail
           echo "CORE_IP=$CORE_IP"
+          echo "CORE_IPS=$CORE_IPS"
           echo "BUSINESS_IP=$BUSINESS_IP"
           echo "OPS_IP=$OPS_IP"
           echo "REALTIME_IP=$REALTIME_IP"
           echo "MIDDLEWARE_IP=$MIDDLEWARE_IP"
 
           test -n "$CORE_IP" && test "$CORE_IP" != "None"
+          test -n "$CORE_IPS" && test "$CORE_IPS" != "None"
           test -n "$BUSINESS_IP" && test "$BUSINESS_IP" != "None"
           test -n "$OPS_IP" && test "$OPS_IP" != "None"
           test -n "$REALTIME_IP" && test "$REALTIME_IP" != "None"
@@ -113,6 +115,7 @@ jobs:
           PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
 
           PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          PROD_MEDIA_BUCKET_NAME: ${{ secrets.PROD_MEDIA_BUCKET_NAME }}
         run: |
           set -euo pipefail
 
@@ -168,7 +171,7 @@ jobs:
           DATABASE_URL=postgresql+psycopg://${PROD_DB_USER}:${PROD_DB_PASSWORD}@${PROD_DB_HOST}:5432/${PROD_DB_NAME}
           JWT_SECRET=${PROD_JWT_SECRET}
           JWT_ALGORITHM=HS256
-          S3_BUCKET=${PROD_DB_NAME}-media
+          S3_BUCKET=${PROD_MEDIA_BUCKET_NAME}
           S3_REGION=${AWS_REGION}
           EOF"
           }
@@ -192,6 +195,8 @@ jobs:
           DATABASE_URL=postgresql+psycopg://${PROD_DB_USER}:${PROD_DB_PASSWORD}@${PROD_DB_HOST}:5432/${PROD_DB_NAME}
           JWT_SECRET=${PROD_JWT_SECRET}
           JWT_ALGORITHM=HS256
+          MQTT_HOST=${MIDDLEWARE_IP}
+          MQTT_PORT=1883
           EOF"
           }
 
@@ -233,4 +238,19 @@ jobs:
           deploy_block "core" "${CORE_IP}" "deploy/prod/core" "make_env_core"
           deploy_block "business" "${BUSINESS_IP}" "deploy/prod/business" "make_env_business"
           deploy_block "ops" "${OPS_IP}" "deploy/prod/ops" "make_env_ops"
+
+          # ---- Observability (Prometheus + Grafana) on OPS ----
+          ssh_exec "${OPS_IP}" "mkdir -p /home/ubuntu/deploy/ops/observability"
+          rsync_copy "deploy/prod/ops/observability" "${OPS_IP}" "/home/ubuntu/deploy/ops/observability"
+
+          ssh_exec "${OPS_IP}" "set -e
+            cd /home/ubuntu/deploy/ops/observability
+            if docker compose version >/dev/null 2>&1; then
+              docker compose up -d --remove-orphans
+            else
+              docker-compose up -d --remove-orphans
+            fi
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
+          "
+
           deploy_block "realtime" "${REALTIME_IP}" "deploy/prod/realtime" "make_env_realtime"
