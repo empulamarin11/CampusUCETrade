@@ -199,8 +199,8 @@ jobs:
 
           make_env_middleware () {
             HOST_IP="$1"
-            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/middleware/.env <<'EOF'
-          # middleware no DB
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/middleware/.env <<EOF
+          MIDDLEWARE_IP=${MIDDLEWARE_IP}
           EOF"
           }
 
