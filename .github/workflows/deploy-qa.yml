@@ -1,8 +1,8 @@
-name: Deploy QA (EC2 via Bastion)
+name: Deploy QA (EC2 via Bastion, Dynamic IPs)
 
 on:
   push:
-    branches: ["qa"]
+    branches: ["feat/pwa"]
     paths:
       - "deploy/qa/**"
       - ".github/workflows/deploy-qa.yml"
@@ -10,6 +10,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    env:
+      PROJECT_TAG: campusuce-trade
+      ENV_TAG: qa
+      AWS_REGION: ${{ secrets.QA_AWS_REGION }}
 
     steps:
       - name: Checkout
@@ -24,13 +29,78 @@ jobs:
           printf '%s' "${{ secrets.QA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           sed -i 's/\r$//' ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
-          # Trust bastion
           ssh-keyscan -H "${BASTION_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Configure AWS credentials (QA)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Discover private IPs (by tags)
+        run: |
+          set -euo pipefail
+
+          ip_for_role () {
+            local ROLE_SHORT="$1"
+            aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Project,Values=${PROJECT_TAG}" \
+                "Name=tag:Env,Values=${ENV_TAG}" \
+                "Name=tag:RoleShort,Values=${ROLE_SHORT}" \
+                "Name=instance-state-name,Values=running" \
+              --query "Reservations[].Instances[].PrivateIpAddress" \
+              --output text
+          }
+
+          echo "CORE_IPS=$(ip_for_role core)" >> $GITHUB_ENV
+          echo "BUSINESS_IP=$(ip_for_role business)" >> $GITHUB_ENV
+          echo "OPS_IP=$(ip_for_role ops)" >> $GITHUB_ENV
+          echo "REALTIME_IP=$(ip_for_role realtime)" >> $GITHUB_ENV
+          echo "MIDDLEWARE_IP=$(ip_for_role middleware)" >> $GITHUB_ENV
+
+      - name: Pick CORE_IP from CORE_IPS
+        env:
+          SSH_USER: ubuntu
+          BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
+        run: |
+          set -euo pipefail
+
+          pick_core_ip () {
+            for ip in $CORE_IPS; do
+              echo "Testing CORE candidate: $ip" >&2
+              if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
+                -o ProxyJump=${SSH_USER}@${BASTION_HOST} ${SSH_USER}@${ip} "echo ok" >/dev/null 2>&1; then
+                echo "$ip"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          CORE_IP="$(pick_core_ip)"
+          echo "CORE_IP=$CORE_IP" >> $GITHUB_ENV
+          echo "Selected CORE_IP=$CORE_IP"
+
+      - name: Sanity check IPs
+        run: |
+          set -euo pipefail
+          echo "CORE_IP=$CORE_IP"
+          echo "BUSINESS_IP=$BUSINESS_IP"
+          echo "OPS_IP=$OPS_IP"
+          echo "REALTIME_IP=$REALTIME_IP"
+          echo "MIDDLEWARE_IP=$MIDDLEWARE_IP"
+          test -n "$CORE_IP" && test "$CORE_IP" != "None"
+          test -n "$BUSINESS_IP" && test "$BUSINESS_IP" != "None"
+          test -n "$OPS_IP" && test "$OPS_IP" != "None"
+          test -n "$REALTIME_IP" && test "$REALTIME_IP" != "None"
+          test -n "$MIDDLEWARE_IP" && test "$MIDDLEWARE_IP" != "None"
 
       - name: Deploy to QA hosts through Bastion
         env:
-          SSH_USER: "ubuntu"
+          SSH_USER: ubuntu
           BASTION_HOST: ${{ secrets.QA_BASTION_HOST }}
 
           GHCR_USER: ${{ secrets.QA_GHCR_USER }}
@@ -42,13 +112,7 @@ jobs:
           QA_DB_PASSWORD: ${{ secrets.QA_DB_PASSWORD }}
 
           QA_JWT_SECRET: ${{ secrets.QA_JWT_SECRET }}
-
-          # IMPORTANT: update these IPs when terraform recreates
-          CORE_IP: "10.0.4.206"
-          BUSINESS_IP: "10.0.4.248"
-          OPS_IP: "10.0.4.122"
-          REALTIME_IP: "10.0.4.236"
-          MIDDLEWARE_IP: "10.0.4.218"
+          QA_MEDIA_BUCKET_NAME: ${{ secrets.QA_MEDIA_BUCKET_NAME }}
         run: |
           set -euo pipefail
 
@@ -104,8 +168,8 @@ jobs:
           DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
           JWT_SECRET=${QA_JWT_SECRET}
           JWT_ALGORITHM=HS256
-          S3_BUCKET=${QA_DB_NAME}-media
-          S3_REGION=us-east-1
+          S3_BUCKET=${QA_MEDIA_BUCKET_NAME}
+          S3_REGION=${AWS_REGION}
           EOF"
           }
 
@@ -128,13 +192,15 @@ jobs:
           DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
           JWT_SECRET=${QA_JWT_SECRET}
           JWT_ALGORITHM=HS256
+          MQTT_HOST=${MIDDLEWARE_IP}
+          MQTT_PORT=1883
           EOF"
           }
 
           make_env_middleware () {
             HOST_IP="$1"
             ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/middleware/.env <<'EOF'
-          # Middleware usually has no DB
+          # middleware no DB
           EOF"
           }
 
@@ -162,11 +228,21 @@ jobs:
             "
           }
 
-          # 1) Middleware first
           deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/qa/middleware" "make_env_middleware"
-
-          # 2) Then app blocks
           deploy_block "core" "${CORE_IP}" "deploy/qa/core" "make_env_core"
           deploy_block "business" "${BUSINESS_IP}" "deploy/qa/business" "make_env_business"
           deploy_block "ops" "${OPS_IP}" "deploy/qa/ops" "make_env_ops"
+          # ---- Observability (Prometheus + Grafana) on OPS ----
+          ssh_exec "${OPS_IP}" "mkdir -p /home/ubuntu/deploy/ops/observability"
+          rsync_copy "deploy/qa/ops/observability" "${OPS_IP}" "/home/ubuntu/deploy/ops/observability"
+
+          ssh_exec "${OPS_IP}" "set -e
+            cd /home/ubuntu/deploy/ops/observability
+            if docker compose version >/dev/null 2>&1; then
+              docker compose up -d --remove-orphans
+            else
+              docker-compose up -d --remove-orphans
+            fi
+            docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
+          "
           deploy_block "realtime" "${REALTIME_IP}" "deploy/qa/realtime" "make_env_realtime"

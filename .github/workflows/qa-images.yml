@@ -2,7 +2,7 @@ name: Build & Push QA Images (GHCR)
 
 on:
   push:
-    branches: ["qa"]
+    branches: ["feat/pwa"]
     paths:
       - "services/**"
       - ".github/workflows/qa-images.yml"
