@@ -2,7 +2,7 @@ name: Deploy QA (EC2 via Bastion, Dynamic IPs)
 
 on:
   push:
-    branches: ["feat/pwa"]
+    branches: ["qa"]
     paths:
       - "deploy/qa/**"
       - ".github/workflows/deploy-qa.yml"
