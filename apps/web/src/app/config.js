@@ -1,3 +1,3 @@
 export const config = {
-  API_BASE: "", // Empty to use Vite proxy
+  API_BASE: import.meta.env.VITE_API_BASE_URL || "",
 };
