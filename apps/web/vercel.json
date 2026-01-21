@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "http://campusuce-trade-qa-alb-534881177.us-east-1.elb.amazonaws.com/$1"
-    }
-  ]
-}
