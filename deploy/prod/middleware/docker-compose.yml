@@ -9,9 +9,6 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: qa-rabbitmq
-    environment:
-      - RABBITMQ_DEFAULT_USER=campus
-      - RABBITMQ_DEFAULT_PASS=campus123
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -45,7 +42,7 @@ services:
       - KAFKA_BROKER_ID=1
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://${MIDDLEWARE_IP}:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
     ports:
       - "9092:9092"
@@ -61,13 +58,7 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - N8N_HOST=0.0.0.0
-      - N8N_EDITOR_BASE_URL=http://${MIDDLEWARE_IP}:5678
-      - WEBHOOK_URL=http://${MIDDLEWARE_IP}:5678/
-      - N8N_DIAGNOSTICS_ENABLED=false
-      - N8N_PERSONALIZATION_ENABLED=false
-      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
-      - N8N_TEMPLATES_ENABLED=false
-      - N8N_COMMUNITY_PACKAGES_ENABLED=false
+      - WEBHOOK_URL=http://qa-n8n:5678/
       - GENERIC_TIMEZONE=America/Guayaquil
     volumes:
       - n8n_data:/home/node/.n8n

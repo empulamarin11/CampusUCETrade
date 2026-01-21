@@ -5,6 +5,9 @@ locals {
   is_qa   = var.env == "qa"
   is_prod = var.env == "prod"
   has_alb = var.env != "dev" # we enable ALB for QA + PROD
+
+  # NEW: enable ASG only in prod
+  enable_asg = var.env == "prod"
 }
 
 # ==============================================================================
@@ -27,7 +30,7 @@ module "bastion" {
   vpc_id           = module.network.vpc_id
   public_subnet_id = module.network.public_subnet_ids[0]
 
-  ssh_key_name = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  ssh_key_name      = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
   ssh_ingress_cidrs = var.ssh_ingress_cidrs
 
   tags = var.tags
@@ -36,11 +39,6 @@ module "bastion" {
 # ==============================================================================
 # 2. LOAD BALANCING (ALB) - We use ALB as "API Gateway"
 # ==============================================================================
-# NOTE: This is enabled for QA and PROD (has_alb == true).
-# The ALB module creates:
-# - Public ALB
-# - ALB Security Group (open 80)
-# - Default Target Group + Listener
 
 module "alb" {
   source = "../modules/alb_public"
@@ -59,8 +57,6 @@ module "alb" {
 
 # ==============================================================================
 # 3. COMPUTE LAYER
-# QA strategy: 4 hosts for microservices + 1 host for middleware (Rabbit/MQTT/Kafka/Redis)
-# PROD strategy: 3 functional groups (core/business/ops) + realtime + middleware (can be tuned later)
 # ==============================================================================
 
 # --------------------------------------------
@@ -80,10 +76,10 @@ module "compute_qa_core" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -101,10 +97,10 @@ module "compute_qa_business" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -122,10 +118,10 @@ module "compute_qa_ops" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -143,16 +139,16 @@ module "compute_qa_realtime" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
 
 # --------------------------------------------
-# QA: Middleware Host (RabbitMQ + MQTT + Kafka + Redis)
+# QA: Middleware Host
 # --------------------------------------------
 module "compute_qa_middleware" {
   source = "../modules/compute"
@@ -167,10 +163,10 @@ module "compute_qa_middleware" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -179,9 +175,10 @@ module "compute_qa_middleware" {
 # PROD: Functional Groups (base)
 # --------------------------------------------
 
+# PROD CORE (EC2) - ONLY when ASG is disabled
 module "compute_prod_core" {
   source = "../modules/compute"
-  count  = local.is_prod ? 1 : 0
+  count  = (local.is_prod && !local.enable_asg) ? 1 : 0
 
   name          = "${local.name}-core"
   environment   = var.env
@@ -192,10 +189,37 @@ module "compute_prod_core" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
+
+  tags = var.tags
+}
+
+# NEW: PROD CORE (ASG) - enabled in prod
+module "compute_asg_prod_core" {
+  source = "../modules/compute_asg"
+  count  = (local.is_prod && local.enable_asg) ? 1 : 0
+
+  name        = "${local.name}-core"
+  environment = var.env
+  role_name   = "prod-core"
+
+  vpc_id             = module.network.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.network.private_subnet_ids
+
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = module.alb[0].alb_sg_id
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
+
+  target_group_arns = [module.alb[0].target_group_arn]
+
+  min_size         = 1
+  desired_capacity = 1
+  max_size         = 2
 
   tags = var.tags
 }
@@ -213,10 +237,10 @@ module "compute_prod_business" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -234,10 +258,10 @@ module "compute_prod_ops" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -255,10 +279,10 @@ module "compute_prod_realtime" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = local.has_alb ? module.alb[0].alb_sg_id : null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = local.has_alb ? module.alb[0].alb_sg_id : null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -276,10 +300,10 @@ module "compute_prod_middleware" {
   vpc_cidr           = var.vpc_cidr
   private_subnet_ids = module.network.private_subnet_ids
 
-  bastion_sg_id          = module.bastion.security_group_id
-  alb_sg_id              = null
-  ssh_key_name           = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
-  instance_profile_name  = var.instance_profile_name
+  bastion_sg_id         = module.bastion.security_group_id
+  alb_sg_id             = null
+  ssh_key_name          = var.ssh_key_name != null ? var.ssh_key_name : (length(aws_key_pair.svc) > 0 ? aws_key_pair.svc[0].key_name : null)
+  instance_profile_name = var.instance_profile_name
 
   tags = var.tags
 }
@@ -294,7 +318,6 @@ module "media_bucket" {
   tags   = var.tags
 }
 
-# RDS in QA and PROD (NOT in dev)
 module "database" {
   source = "../modules/data_rds_postgres"
   count  = var.env != "dev" ? 1 : 0
@@ -314,16 +337,16 @@ module "database" {
 }
 
 # ==============================================================================
-# 5. ALB ROUTING RULES (API Gateway behavior)
-# We keep it simple: 1 target group per host.
+# 5. ALB ROUTING RULES
 # ==============================================================================
 
 # Default TG from module ALB will be used as CORE TG
+# IMPORTANT: For PROD core we now attach via ASG, so this attachment stays ONLY for QA.
 resource "aws_lb_target_group_attachment" "default_core_attach" {
-  count = local.has_alb ? 1 : 0
+  count = (local.has_alb && local.is_qa) ? 1 : 0
 
   target_group_arn = module.alb[0].target_group_arn
-  target_id        = local.is_qa ? module.compute_qa_core[0].instance_id : module.compute_prod_core[0].instance_id
+  target_id        = module.compute_qa_core[0].instance_id
   port             = 80
 }
 
@@ -394,7 +417,7 @@ resource "aws_lb_target_group" "tg_realtime" {
   tags = var.tags
 }
 
-# Attachments for the extra TGs
+# Attachments for extra TGs
 resource "aws_lb_target_group_attachment" "business_attach" {
   count = local.has_alb ? 1 : 0
 

@@ -67,16 +67,14 @@ output "qa_middleware_private_ip" {
 # ==============================================================================
 
 output "prod_core_private_ip" {
-  value = var.env == "prod" ? module.compute_prod_core[0].private_ip : null
+  value = (var.env == "prod" && length(module.compute_prod_core) > 0) ? module.compute_prod_core[0].private_ip : null
 }
 
 output "prod_business_private_ip" {
   value = var.env == "prod" ? module.compute_prod_business[0].private_ip : null
 }
 
-output "prod_ops_private_ip" {
-  value = var.env == "prod" ? module.compute_prod_ops[0].private_ip : null
-}
+
 
 output "prod_realtime_private_ip" {
   value = var.env == "prod" ? module.compute_prod_realtime[0].private_ip : null
@@ -108,4 +106,7 @@ output "rds_db_name" {
 
 output "media_bucket_name" {
   value = module.media_bucket.bucket_id
+}
+output "prod_core_asg_name" {
+  value = (var.env == "prod" && length(module.compute_asg_prod_core) > 0) ? module.compute_asg_prod_core[0].asg_name : null
 }

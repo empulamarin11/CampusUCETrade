@@ -16,7 +16,7 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
-  
+
   # REMOVED: profile = var.aws_profile 
   # Reason: We rely on environment variables or default profile for CI/CD compatibility.
 
