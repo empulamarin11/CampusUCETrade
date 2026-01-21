@@ -179,7 +179,7 @@ jobs:
           DATABASE_URL=postgresql+psycopg://${QA_DB_USER}:${QA_DB_PASSWORD}@${QA_DB_HOST}:5432/${QA_DB_NAME}
           JWT_SECRET=${QA_JWT_SECRET}
           JWT_ALGORITHM=HS256
-          RABBITMQ_URL=amqp://guest:guest@${MIDDLEWARE_IP}:5672/
+          RABBITMQ_URL=amqp://campus:campus123@${MIDDLEWARE_IP}:5672/
           KAFKA_BOOTSTRAP_SERVERS=${MIDDLEWARE_IP}:9092
           MQTT_HOST=${MIDDLEWARE_IP}
           MQTT_PORT=1883
