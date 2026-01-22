@@ -10,8 +10,8 @@ scrape_configs:
     static_configs:
       - targets:
           - "10.0.3.169:9100"  # ops
-          - "10.0.4.84:9100"   # core (asg)
-          - "10.0.4.187:9100"  # core (asg)
-          - "10.0.3.216:9100"  # business
-          - "10.0.3.215:9100"  # realtime
-          - "10.0.3.220:9100"  # middleware
+          - "10.0.4.83:9100"   # core (asg)
+          - "10.0.4.31:9100"  # core (asg)
+          - "10.0.3.157:9100"  # business
+          - "10.0.3.225:9100"  # realtime
+          - "10.0.3.63:9100"  # middleware

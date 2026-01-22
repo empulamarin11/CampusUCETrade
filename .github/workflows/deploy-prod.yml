@@ -238,19 +238,4 @@ jobs:
           deploy_block "core" "${CORE_IP}" "deploy/prod/core" "make_env_core"
           deploy_block "business" "${BUSINESS_IP}" "deploy/prod/business" "make_env_business"
           deploy_block "ops" "${OPS_IP}" "deploy/prod/ops" "make_env_ops"
-
-          # ---- Observability (Prometheus + Grafana) on OPS ----
-          ssh_exec "${OPS_IP}" "mkdir -p /home/ubuntu/deploy/ops/observability"
-          rsync_copy "deploy/prod/ops/observability" "${OPS_IP}" "/home/ubuntu/deploy/ops/observability"
-
-          ssh_exec "${OPS_IP}" "set -e
-            cd /home/ubuntu/deploy/ops/observability
-            if docker compose version >/dev/null 2>&1; then
-              docker compose up -d --remove-orphans
-            else
-              docker-compose up -d --remove-orphans
-            fi
-            docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 20
-          "
-
           deploy_block "realtime" "${REALTIME_IP}" "deploy/prod/realtime" "make_env_realtime"
