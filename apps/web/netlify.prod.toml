@@ -1,0 +1,9 @@
+[build]
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/api/*"
+  to = "http://campusuce-trade-prod-alb-1661443361.us-east-1.elb.amazonaws.com/:splat"
+  status = 200
+  force = true
