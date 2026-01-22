@@ -1,12 +1,14 @@
 {
-  "name": "@campus/web",
+  "name": "web",
   "private": true,
   "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "echo \"web: dev placeholder\"",
-    "build": "echo \"web: build placeholder\"",
-    "lint": "echo \"web: lint placeholder\"",
-    "test": "echo \"web: test placeholder\"",
-    "format": "echo \"web: format placeholder\""
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^7.2.4"
   }
 }

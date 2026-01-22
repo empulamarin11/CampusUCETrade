@@ -1,25 +1,30 @@
 import os
 from fastapi import FastAPI
-from app.routers import router
+
+from app.interfaces.routers import router
+from app.infrastructure.db import Base, engine
+from app.infrastructure.models import Item  # noqa: F401
 
 SERVICE_NAME = "item-service"
 
 def create_app() -> FastAPI:
-    # When behind NGINX with a path prefix (/items), we set root_path
-    # so Swagger UI requests the correct /items/openapi.json.
     root_path = os.getenv("SERVICE_ROOT_PATH", "")
 
     app = FastAPI(
         title=f"CampusUCETrade - {SERVICE_NAME}",
-        version="0.1.0",
+        version="0.2.0",
         root_path=root_path,
         root_path_in_servers=True,
         docs_url="/docs",
         openapi_url="/openapi.json",
     )
 
-    app.include_router(router)
+    @app.on_event("startup")
+    async def startup():
+        if os.getenv("TESTING") != "1":
+            Base.metadata.create_all(bind=engine)
 
+    app.include_router(router)
     return app
 
 app = create_app()

@@ -1,11 +1,11 @@
-variable "name_prefix" { type = string }
 
-variable "force_destroy" {
-  type    = bool
-  default = true
+variable "name" {
+  description = "Base name for the bucket (e.g., project-env)"
+  type        = string
 }
 
 variable "tags" {
-  type    = map(string)
-  default = {}
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default     = {}
 }

@@ -1,4 +1,23 @@
 services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: campus-postgres
+    environment:
+      POSTGRES_DB: campusuce
+      POSTGRES_USER: campusuce
+      POSTGRES_PASSWORD: campusuce123
+    ports:
+      - "5432:5432"
+    volumes:
+      - campus_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: campus-redis
+    restart: unless-stopped
+    
   gateway:
     image: nginx:alpine
     container_name: campus-gateway
@@ -22,11 +41,23 @@ services:
     build:
       context: ./services/auth-service
     container_name: campus-auth-service
+    env_file:
+      - ./services/auth-service/.env.local
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    expose:
+      - "8000"
 
   user-service:
     build:
       context: ./services/user-service
     container_name: campus-user-service
+    env_file:
+      - ./services/user-service/.env.local
+    expose:
+      - "8000"
 
   item-service:
     build:
@@ -34,8 +65,11 @@ services:
     container_name: campus-item-service
     environment:
       - SERVICE_ROOT_PATH=/items
-    expose:
-      - "8000"
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
 
   search-service:
     build:
@@ -43,8 +77,9 @@ services:
     container_name: campus-search-service
     environment:
       - SERVICE_ROOT_PATH=/search
-    expose:
-      - "8000"
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+    depends_on:
+      - postgres
 
   reservation-service:
     build:
@@ -52,6 +87,14 @@ services:
     container_name: campus-reservation-service
     environment:
       - SERVICE_ROOT_PATH=/reservations
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+      - RABBITMQ_URL=amqp://campus:campus123@rabbitmq:5672/%2F
+      - RABBITMQ_EXCHANGE=campus.events
+    depends_on:
+      - postgres
+      - rabbitmq
     expose:
       - "8000"
 
@@ -61,6 +104,11 @@ services:
     container_name: campus-delivery-service
     environment:
       - SERVICE_ROOT_PATH=/delivery
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
 
@@ -70,6 +118,16 @@ services:
     container_name: campus-notification-service
     environment:
       - SERVICE_ROOT_PATH=/notifications
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+      - RABBITMQ_URL=amqp://campus:campus123@rabbitmq:5672/%2F
+      - RABBITMQ_EXCHANGE=campus.events
+      - RABBITMQ_QUEUE=notification-service
+      - RABBITMQ_BINDINGS=reservation.*
+    depends_on:
+      - postgres
+      - rabbitmq
     expose:
       - "8000"
 
@@ -79,6 +137,11 @@ services:
     container_name: campus-reputation-service
     environment:
       - SERVICE_ROOT_PATH=/reputation
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
 
@@ -88,6 +151,9 @@ services:
     container_name: campus-traceability-service
     environment:
       - SERVICE_ROOT_PATH=/traceability
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      - JWT_SECRET=dev_secret_change_me
+      - JWT_ALGORITHM=HS256
     expose:
       - "8000"
 
@@ -97,5 +163,26 @@ services:
     container_name: campus-chat-service
     environment:
       - SERVICE_ROOT_PATH=/chat
+      - DATABASE_URL=postgresql+psycopg://campusuce:campusuce123@postgres:5432/campusuce
+      # Optional (only if you later add JWT validation in chat)
+      # - JWT_SECRET=dev_secret_change_me
+      # - JWT_ALGORITHM=HS256
+    depends_on:
+      - postgres
     expose:
       - "8000"
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: campus-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: campus
+      RABBITMQ_DEFAULT_PASS: campus123
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Web UI
+    restart: unless-stopped
+
+volumes:
+  campus_pgdata:

@@ -1,0 +1,236 @@
+name: Deploy PROD (EC2/ASG via Bastion, Dynamic IPs)
+
+on:
+  push:
+    branches: ["main"] 
+    paths:
+      - "deploy/prod/**"
+      - ".github/workflows/deploy-prod.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_TAG: campusuce-trade
+      ENV_TAG: prod
+      AWS_REGION: ${{ secrets.PROD_AWS_REGION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key + known_hosts
+        env:
+          BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          sed -i 's/\r$//' ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${BASTION_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Configure AWS credentials (PROD)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.PROD_AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Discover private IPs (by tags)
+        run: |
+          set -euo pipefail
+
+          ip_for_role () {
+            local ROLE_SHORT="$1"
+            aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Project,Values=${PROJECT_TAG}" \
+                "Name=tag:Env,Values=${ENV_TAG}" \
+                "Name=tag:RoleShort,Values=${ROLE_SHORT}" \
+                "Name=instance-state-name,Values=running" \
+              --query "Reservations[].Instances[].PrivateIpAddress" \
+              --output text
+          }
+
+          echo "CORE_IPS=$(ip_for_role core)" >> $GITHUB_ENV
+          echo "BUSINESS_IP=$(ip_for_role business)" >> $GITHUB_ENV
+          echo "OPS_IP=$(ip_for_role ops)" >> $GITHUB_ENV
+          echo "REALTIME_IP=$(ip_for_role realtime)" >> $GITHUB_ENV
+          echo "MIDDLEWARE_IP=$(ip_for_role middleware)" >> $GITHUB_ENV
+
+      - name: Pick CORE_IP from CORE_IPS
+        env:
+          SSH_USER: ubuntu
+          BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
+        run: |
+          set -euo pipefail
+
+          pick_core_ip () {
+            for ip in $CORE_IPS; do
+              echo "Testing CORE candidate: $ip" >&2
+              if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=8 \
+                -o ProxyJump=${SSH_USER}@${BASTION_HOST} ${SSH_USER}@${ip} "echo ok" >/dev/null 2>&1; then
+                echo "$ip"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          CORE_IP="$(pick_core_ip)"
+          echo "CORE_IP=$CORE_IP" >> $GITHUB_ENV
+          echo "Selected CORE_IP=$CORE_IP"
+
+      - name: Sanity check IPs
+        run: |
+          set -euo pipefail
+          echo "CORE_IP=$CORE_IP"
+          echo "BUSINESS_IP=$BUSINESS_IP"
+          echo "OPS_IP=$OPS_IP"
+          echo "REALTIME_IP=$REALTIME_IP"
+          echo "MIDDLEWARE_IP=$MIDDLEWARE_IP"
+
+          test -n "$CORE_IP" && test "$CORE_IP" != "None"
+          test -n "$BUSINESS_IP" && test "$BUSINESS_IP" != "None"
+          test -n "$OPS_IP" && test "$OPS_IP" != "None"
+          test -n "$REALTIME_IP" && test "$REALTIME_IP" != "None"
+          test -n "$MIDDLEWARE_IP" && test "$MIDDLEWARE_IP" != "None"
+
+      - name: Deploy to PROD hosts through Bastion
+        env:
+          SSH_USER: ubuntu
+          BASTION_HOST: ${{ secrets.PROD_BASTION_HOST }}
+
+          GHCR_USER: ${{ secrets.PROD_GHCR_USER }}
+          GHCR_TOKEN: ${{ secrets.PROD_GHCR_TOKEN }}
+
+          PROD_DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          PROD_DB_NAME: ${{ secrets.PROD_DB_NAME }}
+          PROD_DB_USER: ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+
+          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+        run: |
+          set -euo pipefail
+
+          ssh_exec () {
+            HOST_IP="$1"
+            shift
+            ssh -i ~/.ssh/id_rsa \
+              -o StrictHostKeyChecking=no \
+              -o ProxyJump=${SSH_USER}@${BASTION_HOST} \
+              ${SSH_USER}@${HOST_IP} "$@"
+          }
+
+          rsync_copy () {
+            SRC_DIR="$1"
+            HOST_IP="$2"
+            DEST_DIR="$3"
+            rsync -avz \
+              -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ProxyJump=${SSH_USER}@${BASTION_HOST}" \
+              "${SRC_DIR}/" "${SSH_USER}@${HOST_IP}:${DEST_DIR}/"
+          }
+
+          preflight () {
+            HOST_IP="$1"
+            echo "== Preflight ${HOST_IP} =="
+            ssh_exec "$HOST_IP" "set -e
+              whoami
+              hostname
+              docker --version
+              docker compose version || docker-compose --version
+            "
+          }
+
+          docker_login () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "set -e
+              echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+            "
+          }
+
+          make_env_core () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/core/.env <<'EOF'
+          DATABASE_URL=postgresql+psycopg://${PROD_DB_USER}:${PROD_DB_PASSWORD}@${PROD_DB_HOST}:5432/${PROD_DB_NAME}
+          REDIS_URL=redis://${MIDDLEWARE_IP}:6379/0
+          JWT_SECRET=${PROD_JWT_SECRET}
+          JWT_ALGORITHM=HS256
+          EOF"
+          }
+
+          make_env_business () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/business/.env <<'EOF'
+          DATABASE_URL=postgresql+psycopg://${PROD_DB_USER}:${PROD_DB_PASSWORD}@${PROD_DB_HOST}:5432/${PROD_DB_NAME}
+          JWT_SECRET=${PROD_JWT_SECRET}
+          JWT_ALGORITHM=HS256
+          S3_BUCKET=${PROD_DB_NAME}-media
+          S3_REGION=${AWS_REGION}
+          EOF"
+          }
+
+          make_env_ops () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/ops/.env <<'EOF'
+          DATABASE_URL=postgresql+psycopg://${PROD_DB_USER}:${PROD_DB_PASSWORD}@${PROD_DB_HOST}:5432/${PROD_DB_NAME}
+          JWT_SECRET=${PROD_JWT_SECRET}
+          JWT_ALGORITHM=HS256
+          RABBITMQ_URL=amqp://guest:guest@${MIDDLEWARE_IP}:5672/
+          KAFKA_BOOTSTRAP_SERVERS=${MIDDLEWARE_IP}:9092
+          MQTT_HOST=${MIDDLEWARE_IP}
+          MQTT_PORT=1883
+          EOF"
+          }
+
+          make_env_realtime () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/realtime/.env <<'EOF'
+          DATABASE_URL=postgresql+psycopg://${PROD_DB_USER}:${PROD_DB_PASSWORD}@${PROD_DB_HOST}:5432/${PROD_DB_NAME}
+          JWT_SECRET=${PROD_JWT_SECRET}
+          JWT_ALGORITHM=HS256
+          EOF"
+          }
+
+          make_env_middleware () {
+            HOST_IP="$1"
+            ssh_exec "$HOST_IP" "cat > /home/ubuntu/deploy/middleware/.env <<'EOF'
+          # Middleware usually has no DB
+          EOF"
+          }
+
+          deploy_block () {
+            NAME="$1"
+            HOST_IP="$2"
+            SRC_DIR="$3"
+            ENV_FN="$4"
+
+            echo "== Deploying ${NAME} to ${HOST_IP} =="
+
+            ssh_exec "${HOST_IP}" "mkdir -p /home/ubuntu/deploy/${NAME}"
+            rsync_copy "${SRC_DIR}" "${HOST_IP}" "/home/ubuntu/deploy/${NAME}"
+
+            ${ENV_FN} "${HOST_IP}"
+
+            preflight "${HOST_IP}"
+            docker_login "${HOST_IP}"
+
+            ssh_exec "${HOST_IP}" "set -e
+              cd /home/ubuntu/deploy/${NAME}
+              docker compose --env-file .env pull
+              docker compose --env-file .env up -d --remove-orphans
+              docker ps --format 'table {{.Names}}\t{{.Status}}' | head -n 30
+            "
+          }
+
+          # 1) Middleware first
+          deploy_block "middleware" "${MIDDLEWARE_IP}" "deploy/prod/middleware" "make_env_middleware"
+
+          # 2) Then app blocks
+          deploy_block "core" "${CORE_IP}" "deploy/prod/core" "make_env_core"
+          deploy_block "business" "${BUSINESS_IP}" "deploy/prod/business" "make_env_business"
+          deploy_block "ops" "${OPS_IP}" "deploy/prod/ops" "make_env_ops"
+          deploy_block "realtime" "${REALTIME_IP}" "deploy/prod/realtime" "make_env_realtime"

@@ -1,0 +1,36 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: qa-realtime-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - chat-service
+      - delivery-service
+    restart: unless-stopped
+
+  chat-service:
+    image: ghcr.io/empulamarin11/campusucetrade-chat:qa
+    container_name: qa-chat-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SERVICE_ROOT_PATH=/chat
+    restart: unless-stopped
+
+  delivery-service:
+    image: ghcr.io/empulamarin11/campusucetrade-delivery:qa
+    container_name: qa-delivery-service
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SERVICE_ROOT_PATH=/delivery
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=HS256
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_CLIENT_ID=delivery-service
+      - TOPIC_CREATE=campus/delivery/create
+      - TOPIC_CONFIRM=campus/delivery/confirm
+      - TOPIC_DELIVERED=campus/delivery/delivered
+    restart: unless-stopped

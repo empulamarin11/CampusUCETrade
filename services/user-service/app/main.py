@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from app.routers import router
+from app.interfaces.routers import router
+from app.infrastructure.init_db import init_db
 
 app = FastAPI(
     title="CampusUCETrade - user-service",
@@ -10,3 +11,7 @@ app = FastAPI(
 )
 
 app.include_router(router)
+
+@app.on_event("startup")
+async def startup():
+    init_db()

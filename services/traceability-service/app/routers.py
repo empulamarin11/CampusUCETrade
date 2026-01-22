@@ -1,61 +1,79 @@
-from datetime import datetime
-from typing import Dict, List, Optional
-from uuid import uuid4
+# app/routers.py
+import os
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel, Field
+from app.config import settings
+from app.db import get_db
+from app.models import AuditEvent
 
 router = APIRouter()
+security = HTTPBearer()
 
-# In-memory store for MVP (later replace with PostgreSQL)
-_EVENTS: Dict[str, dict] = {}
+# DEV ONLY: enables /audit/seed for quick local testing
+ENABLE_AUDIT_SEED = os.getenv("ENABLE_AUDIT_SEED", "false").lower() == "true"
 
-class TraceEventCreate(BaseModel):
-    entity_type: str = Field(min_length=1, max_length=50)  # e.g., "item", "reservation"
-    entity_id: str = Field(min_length=1, max_length=100)
-    action: str = Field(min_length=1, max_length=80)       # e.g., "created", "updated"
-    actor_user_id: Optional[str] = Field(default=None, max_length=100)
-    details: Optional[str] = Field(default=None, max_length=1000)
 
-class TraceEventOut(BaseModel):
-    id: str
-    entity_type: str
-    entity_id: str
-    action: str
-    actor_user_id: Optional[str] = None
-    details: Optional[str] = None
-    created_at: str
+def _current_email(creds: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    try:
+        payload = jwt.decode(
+            creds.credentials,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"verify_aud": False},
+        )
+        sub = payload.get("sub")
+        if not sub:
+            raise ValueError("missing_sub")
+        return str(sub).lower()
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 
 @router.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "traceability-service", "protocol": "kafka"}
 
-@router.post("/events", response_model=TraceEventOut)
-def create_event(payload: TraceEventCreate):
-    event_id = str(uuid4())
-    event = {
-        "id": event_id,
-        "entity_type": payload.entity_type,
-        "entity_id": payload.entity_id,
-        "action": payload.action,
-        "actor_user_id": payload.actor_user_id,
-        "details": payload.details,
-        "created_at": datetime.utcnow().isoformat() + "Z",
-    }
-    _EVENTS[event_id] = event
-    return event
 
-@router.get("/events", response_model=List[TraceEventOut])
-def list_events(
-    entity_type: Optional[str] = Query(default=None),
-    entity_id: Optional[str] = Query(default=None),
+@router.get("/audit")
+def list_audit(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _email: str = Depends(_current_email),
 ):
-    items = list(_EVENTS.values())
+    limit = max(1, min(limit, 200))
+    rows = (
+        db.query(AuditEvent)
+        .order_by(AuditEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": str(r.id),
+            "event_type": r.event_type,
+            "source": r.source,
+            "payload_json": r.payload_json,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
 
-    if entity_type:
-        items = [e for e in items if e["entity_type"] == entity_type]
-    if entity_id:
-        items = [e for e in items if e["entity_id"] == entity_id]
 
-    return items
-
+if ENABLE_AUDIT_SEED:
+    @router.post("/audit/seed")
+    def seed_audit(
+        db: Session = Depends(get_db),
+        _email: str = Depends(_current_email),
+    ):
+        row = AuditEvent(
+            event_type="test.event",
+            source="manual",
+            payload_json='{"hello":"world"}',
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return {"ok": True, "id": str(row.id)}

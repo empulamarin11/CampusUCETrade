@@ -1,28 +1,33 @@
-variable "name" { type = string }
-variable "vpc_id" { type = string }
-variable "public_subnet_id" { type = string }
+
+
+variable "name" {
+  description = "Base name for resources (e.g., campus-trade-dev)"
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "VPC ID where the bastion will be deployed"
+  type        = string
+}
+
+variable "public_subnet_id" {
+  description = "ID of the public subnet where the bastion instance will sit"
+  type        = string
+}
 
 variable "ssh_key_name" {
-  type    = string
-  default = null
+  description = "Name of the SSH Key Pair to use for access"
+  type        = string
 }
 
 variable "ssh_ingress_cidrs" {
-  type    = list(string)
-  default = []
-}
-
-variable "instance_profile_name" {
-  type    = string
-  default = null
-}
-
-variable "instance_type" {
-  type    = string
-  default = "t3.micro"
+  description = "List of CIDR blocks allowed to SSH into Bastion (e.g., your home IP)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # Open to world by default (ok for dev/academy)
 }
 
 variable "tags" {
-  type    = map(string)
-  default = {}
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default     = {}
 }
