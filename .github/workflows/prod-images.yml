@@ -2,7 +2,7 @@ name: Build & Push PROD Images (GHCR)
 
 on:
   push:
-    branches: ["main"]   
+    branches: ["dev"]   
     paths:
       - "services/**"
       - ".github/workflows/prod-images.yml"
