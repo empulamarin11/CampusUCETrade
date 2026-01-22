@@ -2,7 +2,7 @@ name: Deploy PROD (EC2/ASG via Bastion, Dynamic IPs)
 
 on:
   push:
-    branches: ["main"] # cuando ya funcione, cambia a: ["main"]
+    branches: ["main"] 
     paths:
       - "deploy/prod/**"
       - ".github/workflows/deploy-prod.yml"
