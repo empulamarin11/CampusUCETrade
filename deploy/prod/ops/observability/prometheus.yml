@@ -5,3 +5,13 @@ scrape_configs:
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
+
+  - job_name: "node"
+    static_configs:
+      - targets:
+          - "10.0.3.169:9100"  # ops
+          - "10.0.4.83:9100"   # core (asg)
+          - "10.0.4.31:9100"  # core (asg)
+          - "10.0.3.157:9100"  # business
+          - "10.0.3.225:9100"  # realtime
+          - "10.0.3.63:9100"  # middleware
