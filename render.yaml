@@ -1,0 +1,90 @@
+services:
+  # PUBLIC API Gateway (single public URL for the Frontend)
+  - name: campusuce-api
+    type: web
+    runtime: image
+    image:
+      url: nginx:alpine
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: AUTH_HOSTPORT
+        fromService:
+          name: campusuce-auth
+          type: pserv
+          property: hostport
+      - key: USER_HOSTPORT
+        fromService:
+          name: campusuce-user
+          type: pserv
+          property: hostport
+    startCommand: >
+      /bin/sh -lc "
+      cat > /etc/nginx/conf.d/default.conf <<'EOF'
+      server {
+        listen ${PORT};
+        server_name _;
+
+        location = /health {
+          add_header Content-Type text/plain;
+          return 200 'ok';
+        }
+
+        location /auth/ {
+          proxy_pass http://${AUTH_HOSTPORT};
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /users/ {
+          proxy_pass http://${USER_HOSTPORT};
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+        }
+      }
+      EOF
+      && nginx -g 'daemon off;'
+      "
+
+  # AUTH (private)
+  - name: campusuce-auth
+    type: pserv
+    runtime: image
+    image:
+      url: ghcr.io/empulamarin11/campusucetrade-auth:qa
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: campusuce-db
+          property: connectionString
+      - key: REDIS_URL
+        value: redis://campusuce-redis:6379/0
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+
+  # USER (private)
+  - name: campusuce-user
+    type: pserv
+    runtime: image
+    image:
+      url: ghcr.io/empulamarin11/campusucetrade-user:qa
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: campusuce-db
+          property: connectionString
+
+  # REDIS (private)
+  - name: campusuce-redis
+    type: pserv
+    runtime: image
+    image:
+      url: redis:7-alpine
+
+databases:
+  - name: campusuce-db
+    plan: free
+    databaseName: campusuce
+    user: campusuce
